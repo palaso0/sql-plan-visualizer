@@ -5,7 +5,7 @@ main{height:100vh;display:flex;flex-direction:column}
 
 header{min-height:68px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:10px 20px;border-bottom:1px solid var(--vscode-panel-border,#333);background:var(--vscode-sideBar-background,var(--vscode-editor-background));flex:none}
 .brand{display:flex;align-items:center;gap:10px;min-width:0}
-.brand-mark{width:26px;height:26px;border:1px solid var(--vscode-textLink-foreground,#3794ff);border-radius:3px;display:grid;place-items:center;color:var(--vscode-textLink-foreground,#3794ff);font-size:14px;flex:none}
+.brand-mark{width:30px;height:30px;border:1px solid var(--vscode-textLink-foreground,#3794ff);border-radius:3px;display:grid;place-items:center;color:var(--vscode-textLink-foreground,#3794ff);font-size:12px;flex:none}.brand-mark svg{width:21px;height:21px;display:block}
 .eyebrow{font-size:10px;color:var(--vscode-descriptionForeground,#9d9d9d);letter-spacing:.06em;margin:0}
 .title{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .toolbar{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}.toolbar-group{display:flex;align-items:center;gap:6px;padding-left:10px;border-left:1px solid var(--vscode-widget-border,#454545)}.toolbar-group:first-child{padding-left:0;border-left:0}.export-group{min-width:max-content}
@@ -55,6 +55,7 @@ h2{font-size:11px;font-weight:600;text-transform:uppercase;color:var(--vscode-si
 .legend i.critical{background:var(--vscode-charts-red,#f14c4c)}
 
 .edge{fill:none;stroke:var(--vscode-textLink-foreground,#3794ff);opacity:.8;stroke-linecap:round}
+.flow-particle{fill:var(--vscode-textLink-foreground,#3794ff);opacity:.9;pointer-events:none}
 
 .stage-label{font-size:10px;fill:var(--vscode-descriptionForeground,#9d9d9d);text-transform:uppercase;letter-spacing:.05em}
 .output-label{font-size:11px;fill:var(--vscode-charts-green,#89d185);font-weight:600}
@@ -78,6 +79,8 @@ h2{font-size:11px;font-weight:600;text-transform:uppercase;color:var(--vscode-si
 .node text.flag{font-size:11px;fill:var(--vscode-charts-yellow,#e2c08d);font-weight:700}.node.critical text.flag{fill:var(--vscode-charts-red,#f14c4c)}
 
 .node.pulse rect{animation:pulse .8s ease-out}
+.node.flow-active>rect:first-child{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:2.5}.node .flow-bar-bg{fill:var(--vscode-widget-border,#454545);stroke:none}.node .flow-bar{fill:var(--vscode-charts-blue,#75beff);stroke:none}.node .flow-input{fill:var(--vscode-charts-yellow,#e2c08d)}.node .flow-output{fill:var(--vscode-charts-green,#89d185)}.node text.flow-label{font-size:8px;fill:var(--vscode-descriptionForeground,#9d9d9d);font-weight:700}.node text.flow-value{font-size:8px;fill:var(--vscode-editor-foreground,#cccccc);font-variant-numeric:tabular-nums}
 @keyframes pulse{50%{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:3.5}}
+@media(prefers-reduced-motion:reduce){.flow-particle{display:none}.node.pulse rect{animation:none}}
 
 @media(max-width:960px){.content{grid-template-columns:1fr}.sidebar{display:none}}

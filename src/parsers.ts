@@ -14,10 +14,14 @@ export class MySQLParser implements PlanParser {
     if (table) {
       const tableCost = table.cost_info as Record<string, unknown> | undefined;
       const label = String(table.access_type ?? 'Table access');
+      const inputRows = number(String(table.rows_examined_per_scan ?? '0'));
+      const filtered = number(String(table.filtered ?? '100')) / 100;
+      const estimatedRows = inputRows ? Math.round(inputRows * filtered) : number(String(table.rows_produced_per_join ?? '0'));
       return node(id, /ALL/i.test(label) ? NodeOperation.Scan : NodeOperation.IndexScan, label, {
         table: table.table_name as string | undefined,
         index: table.key as string | undefined,
-        estimatedRows: number(String(table.rows_produced_per_join ?? table.rows_examined_per_scan ?? '0')),
+        estimatedRows,
+        inputRows,
         estimatedCost: number(String(tableCost?.prefix_cost ?? tableCost?.read_cost ?? '0')),
         filters: table.attached_condition ? [String(table.attached_condition)] : [],
         children: []
