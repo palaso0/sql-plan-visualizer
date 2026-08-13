@@ -1,0 +1,15 @@
+EXPLAIN QUERY PLAN
+SELECT p.id, p.title, c.name, SUM(i.quantity * i.price)
+FROM products p
+JOIN order_items i ON i.product_id = p.id
+JOIN orders o ON o.id = i.order_id
+JOIN customers c ON c.id = o.customer_id
+WHERE o.created_at >= '2025-01-01'
+  AND p.category IN ('hardware', 'software')
+GROUP BY p.id, p.title, c.name
+ORDER BY SUM(i.quantity * i.price) DESC;
+|--SCAN products
+|--SEARCH order_items USING INDEX order_items_product_id_idx (product_id=?)
+|--SEARCH orders USING INTEGER PRIMARY KEY (rowid=?)
+|--SEARCH customers USING INTEGER PRIMARY KEY (rowid=?)
+`--USE TEMP B-TREE FOR ORDER BY

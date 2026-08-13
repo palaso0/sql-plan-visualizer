@@ -1,0 +1,10 @@
+EXPLAIN QUERY PLAN
+SELECT c.name, COUNT(o.id)
+FROM customers c
+JOIN orders o ON o.customer_id = c.id
+WHERE c.status = 'active'
+GROUP BY c.id
+ORDER BY COUNT(o.id) DESC;
+|--SCAN customers
+|--SEARCH orders USING INDEX orders_customer_id_idx (customer_id=?)
+`--USE TEMP B-TREE FOR ORDER BY

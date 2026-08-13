@@ -1,0 +1,68 @@
+[
+  {
+    "Plan": {
+      "Node Type": "Aggregate",
+      "Strategy": "Hashed",
+      "Partial Mode": "Simple",
+      "Startup Cost": 18420.50,
+      "Total Cost": 18489.32,
+      "Plan Rows": 12000,
+      "Plan Width": 96,
+      "Plans": [
+        {
+          "Node Type": "Sort",
+          "Sort Key": ["o.created_at DESC"],
+          "Sort Method": "external merge",
+          "Sort Space Used": 812000,
+          "Sort Space Type": "Disk",
+          "Startup Cost": 18120.44,
+          "Total Cost": 18288.20,
+          "Plan Rows": 67200,
+          "Plan Width": 96,
+          "Plans": [
+            {
+              "Node Type": "Hash Join",
+              "Join Type": "Inner",
+              "Hash Cond": "(o.customer_id = c.id)",
+              "Startup Cost": 420.00,
+              "Total Cost": 16620.11,
+              "Plan Rows": 67200,
+              "Plan Width": 96,
+              "Plans": [
+                {
+                  "Node Type": "Seq Scan",
+                  "Relation Name": "orders",
+                  "Alias": "o",
+                  "Startup Cost": 0.00,
+                  "Total Cost": 12100.00,
+                  "Plan Rows": 850000,
+                  "Plan Width": 64,
+                  "Filter": "(created_at >= CURRENT_DATE - '90 days'::interval)"
+                },
+                {
+                  "Node Type": "Hash",
+                  "Startup Cost": 310.00,
+                  "Total Cost": 310.00,
+                  "Plan Rows": 9000,
+                  "Plan Width": 32,
+                  "Plans": [
+                    {
+                      "Node Type": "Seq Scan",
+                      "Relation Name": "customers",
+                      "Alias": "c",
+                      "Startup Cost": 0.00,
+                      "Total Cost": 310.00,
+                      "Plan Rows": 9000,
+                      "Plan Width": 32,
+                      "Filter": "(account_state = 'active'::text)"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

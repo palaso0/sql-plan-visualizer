@@ -1,0 +1,51 @@
+{
+  "name": "sql-plan-visualizer",
+  "displayName": "SQL Plan Visualizer",
+  "description": "Understand SQL execution plans through an animated visual diagram",
+  "version": "0.1.0",
+  "engines": {
+    "vscode": "^1.125.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "sql-plan-visualizer.visualize", "title": "SQL Plan Visualizer: Visualize EXPLAIN" },
+      { "command": "sql-plan-visualizer.visualizeFromEditor", "title": "SQL Plan Visualizer: Visualize Selection" },
+      { "command": "sql-plan-visualizer.focusInput", "title": "SQL Plan Visualizer: Open Visualizer" }
+    ],
+    "menus": { "editor/context": [{ "command": "sql-plan-visualizer.visualizeFromEditor", "when": "editorHasSelection" }], "editor/title": [{ "command": "sql-plan-visualizer.visualizeFromEditor", "when": "editorHasSelection", "group": "navigation@10" }] },
+    "viewsContainers": { "activitybar": [{ "id": "sql-plan-visualizer", "title": "SQL Plan Visualizer", "icon": "media/database.svg" }] },
+    "views": { "sql-plan-visualizer": [{ "type": "webview", "id": "sql-plan-visualizer.input", "name": "Visualize Plan", "when": "true", "icon": "media/database.svg" }] },
+    "configuration": { "title": "SQL Plan Visualizer", "properties": {
+      "sqlPlanVisualizer.animations": { "type": "boolean", "default": true, "description": "Enable execution animations" },
+      "sqlPlanVisualizer.highlightMode": { "type": "string", "enum": ["risk", "cost", "rows"], "default": "risk", "description": "Metric used to highlight plan nodes" },
+      "sqlPlanVisualizer.maxPlanDepth": { "type": "number", "default": 100, "minimum": 1, "description": "Maximum plan depth rendered" }
+    } }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.125.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "24.x",
+    "typescript-eslint": "^8.61.1",
+    "eslint": "^10.5.0",
+    "typescript": "^6.0.3",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0"
+  },
+  "overrides": {
+    "diff": "^8.0.4",
+    "serialize-javascript": "^7.0.6"
+  }
+}
