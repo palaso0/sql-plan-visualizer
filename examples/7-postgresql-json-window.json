@@ -1,0 +1,57 @@
+[
+  {
+    "Plan": {
+      "Node Type": "WindowAgg",
+      "Startup Cost": 22.45,
+      "Total Cost": 55.10,
+      "Plan Rows": 480,
+      "Plan Width": 132,
+      "Actual Rows": 480,
+      "Actual Total Time": 2.5,
+      "Plans": [
+        {
+          "Node Type": "Sort",
+          "Startup Cost": 22.45,
+          "Total Cost": 23.45,
+          "Plan Rows": 480,
+          "Plan Width": 132,
+          "Sort Key": ["d.name", "e.salary DESC"],
+          "Plans": [
+            {
+              "Node Type": "Nested Loop",
+              "Startup Cost": 1.0,
+              "Total Cost": 18.0,
+              "Plan Rows": 480,
+              "Plan Width": 132,
+              "Plans": [
+                {
+                  "Node Type": "Seq Scan",
+                  "Relation Name": "departments",
+                  "Alias": "d",
+                  "Startup Cost": 0.0,
+                  "Total Cost": 3.0,
+                  "Plan Rows": 10,
+                  "Plan Width": 40,
+                  "Plans": []
+                },
+                {
+                  "Node Type": "Index Scan",
+                  "Relation Name": "employees",
+                  "Alias": "e",
+                  "Index Name": "employees_department_idx",
+                  "Startup Cost": 0.2,
+                  "Total Cost": 12.0,
+                  "Plan Rows": 480,
+                  "Plan Width": 92,
+                  "Index Cond": "(department_id = d.id)",
+                  "Filter": "(status = 'active'::text)",
+                  "Plans": []
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+]

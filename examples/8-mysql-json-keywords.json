@@ -1,0 +1,50 @@
+{
+  "query_block": {
+    "select_id": 1,
+    "cost_info": { "query_cost": "541.00" },
+    "nested_loop": [
+      {
+        "table": {
+          "table_name": "user",
+          "access_type": "ref",
+          "possible_keys": ["PRIMARY", "email_idx"],
+          "key": "email_idx",
+          "key_length": "767",
+          "ref": ["const"],
+          "rows_examined_per_scan": 1,
+          "rows_produced_per_join": 1,
+          "filtered": "100.00",
+          "cost_info": { "read_cost": "0.10", "prefix_cost": "0.10" }
+        }
+      },
+      {
+        "table": {
+          "table_name": "order",
+          "access_type": "range",
+          "possible_keys": ["PRIMARY", "user_id_idx", "created_at_idx"],
+          "key": "user_id_idx",
+          "key_length": "4",
+          "ref": ["app.user.id"],
+          "rows_examined_per_scan": 480,
+          "rows_produced_per_join": 480,
+          "filtered": "100.00",
+          "cost_info": { "read_cost": "520.00", "prefix_cost": "540.00" }
+        }
+      },
+      {
+        "table": {
+          "table_name": "group",
+          "access_type": "eq_ref",
+          "possible_keys": ["PRIMARY"],
+          "key": "PRIMARY",
+          "key_length": "4",
+          "ref": ["app.order.group_id"],
+          "rows_examined_per_scan": 1,
+          "rows_produced_per_join": 480,
+          "filtered": "100.00",
+          "cost_info": { "read_cost": "1.00", "prefix_cost": "541.00" }
+        }
+      }
+    ]
+  }
+}

@@ -14,21 +14,21 @@ button,select{font:inherit;font-size:12px;border-radius:2px;padding:4px 10px;bor
 button{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff);border:0}
 button:hover{background:var(--vscode-button-hoverBackground,#1177bb)}
 button.secondary{background:transparent;color:var(--vscode-editor-foreground,#ccc);border:1px solid var(--vscode-widget-border,#454545)}
+button:disabled{opacity:.45;cursor:default;pointer-events:none}
 select{background:var(--vscode-dropdown-background);color:var(--vscode-dropdown-foreground);border:1px solid var(--vscode-dropdown-border)}
 
 .content{display:grid;grid-template-columns:minmax(0,1fr) 270px;min-height:0;flex:1}
 
-.diagram-panel{position:relative;min-width:0;overflow:auto;background:var(--vscode-editor-background)}.diagram-panel.pan-mode{cursor:grab}.diagram-panel.pan-mode:active{cursor:grabbing}
-.diagram-panel svg{display:block;transform-origin:center center;transition:transform .15s}
+.diagram-panel{position:relative;min-width:0;overflow:auto;scrollbar-gutter:stable;background:var(--vscode-editor-background)}.diagram-panel.pan-mode{cursor:grab}.diagram-panel.pan-mode:active{cursor:grabbing}
+.diagram-panel svg{display:block;transform-origin:center center}
 
 .canvas-status{display:none}
-.plan-tooltip{position:fixed;z-index:10;display:none;max-width:340px;padding:10px 12px;background:var(--vscode-editorHoverWidget-background,#252526);color:var(--vscode-editorHoverWidget-foreground,#cccccc);border:1px solid var(--vscode-editorHoverWidget-border,#454545);border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;font-size:11px}.plan-tooltip.visible{display:block}.tooltip-issue{display:grid;gap:4px}.tooltip-issue+.tooltip-issue{margin-top:9px;padding-top:9px;border-top:1px solid var(--vscode-widget-border,#454545)}.tooltip-issue strong{font-size:10px;text-transform:uppercase;letter-spacing:.04em}.tooltip-issue span{line-height:1.35}.tooltip-issue small{color:var(--vscode-descriptionForeground,#9d9d9d);line-height:1.35}.tooltip-critical{color:var(--vscode-charts-red,#f14c4c)}.tooltip-warning{color:var(--vscode-charts-yellow,#e2c08d)}
+.plan-tooltip{position:fixed;z-index:10;display:none;max-width:360px;min-width:220px;padding:10px 12px;background:var(--vscode-editorHoverWidget-background,#252526);color:var(--vscode-editorHoverWidget-foreground,#cccccc);border:1px solid var(--vscode-editorHoverWidget-border,#454545);border-radius:4px;box-shadow:0 4px 12px rgba(0,0,0,.35);pointer-events:none;font-size:11px}.plan-tooltip.visible{display:block}.tooltip-header{font-size:12px;font-weight:600;color:var(--vscode-textLink-foreground,#3794ff)}.tooltip-desc{color:var(--vscode-descriptionForeground,#9d9d9d);line-height:1.4;margin:2px 0 7px;padding-bottom:7px;border-bottom:1px solid var(--vscode-widget-border,#454545)}.tooltip-row{display:grid;grid-template-columns:minmax(84px,max-content) 1fr;gap:10px;line-height:1.4}.tooltip-row span{color:var(--vscode-descriptionForeground,#9d9d9d)}.tooltip-row b{font-weight:500;font-variant-numeric:tabular-nums}.tooltip-section{font-size:10px;text-transform:uppercase;letter-spacing:.04em;color:var(--vscode-descriptionForeground,#9d9d9d);margin:9px 0 4px}.tooltip-issue{display:grid;gap:4px}.tooltip-issue+.tooltip-issue{margin-top:9px;padding-top:9px;border-top:1px solid var(--vscode-widget-border,#454545)}.tooltip-issue strong{font-size:10px;text-transform:uppercase;letter-spacing:.04em}.tooltip-issue span{line-height:1.35}.tooltip-issue small{color:var(--vscode-descriptionForeground,#9d9d9d);line-height:1.35}.tooltip-critical{color:var(--vscode-charts-red,#f14c4c)}.tooltip-warning{color:var(--vscode-charts-yellow,#e2c08d)}
 
-.zscale{position:absolute;right:14px;bottom:14px;display:flex;gap:6px}
-.zscale button{min-width:36px;height:32px;padding:6px 10px;font-size:14px;line-height:1;background:var(--vscode-editorWidget-background,#252526);color:var(--vscode-editor-foreground,#ccc);border:1px solid var(--vscode-widget-border,#454545);border-radius:4px;font-weight:600}.zscale button.active{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff);border-color:var(--vscode-focusBorder,#007fd4)}
-.zscale button:hover{background:var(--vscode-list-hoverBackground,#2a2d2e);border-color:var(--vscode-focusBorder,#007fd4)}
+.zoom-group button.active{background:var(--vscode-button-background,#0e639c);color:var(--vscode-button-foreground,#fff);border-color:var(--vscode-focusBorder,#007fd4)}
 
 .sidebar{border-left:1px solid var(--vscode-panel-border,#333);background:var(--vscode-sideBar-background,#252526);overflow:auto;padding:14px;min-width:0}
+.query-bar{background:var(--vscode-sideBar-background,#252526);border-bottom:1px solid var(--vscode-panel-border,#333);max-height:40vh;overflow:auto}.query-bar summary{cursor:pointer;padding:8px 14px;font-size:11px;font-weight:600;text-transform:uppercase;color:var(--vscode-sideBarSectionHeader-foreground,#ccc);letter-spacing:.03em;user-select:none;list-style:none}.query-bar summary::-webkit-details-marker,.query-bar summary::marker{display:none}.query-bar pre{margin:0;padding:0 14px 12px;font:11px/1.5 var(--vscode-editor-font-family);white-space:pre;overflow:auto;color:var(--vscode-editor-foreground,#cccccc)}.query-bar pre .sql-clause{transition:background .15s;cursor:pointer;border-radius:2px}.query-bar pre .sql-clause:hover{background:var(--vscode-list-hoverBackground,#2a2d2e)}.query-bar pre .sql-clause.active{background:var(--vscode-editor-selectionBackground,#264f78);outline:1px solid var(--vscode-focusBorder,#007fd4)}.query-bar pre .sql-tok.keyword{color:var(--vscode-symbolIcon-keywordForeground,#569cd6);font-weight:600}.query-bar pre .sql-tok.string{color:var(--vscode-symbolIcon-stringForeground,#ce9178)}.query-bar pre .sql-tok.number{color:var(--vscode-symbolIcon-numberForeground,#b5cea8)}.query-bar pre .sql-tok.comment{color:var(--vscode-symbolIcon-eventForeground,#6a9955);font-style:italic}.query-bar pre .sql-tok.identifier{color:var(--vscode-symbolIcon-propertyForeground,#9cdcfe)}.query-bar pre .sql-tok.operator{color:var(--vscode-symbolIcon-operatorForeground,#d4d4d4)}.query-bar pre .sql-tok.paren{color:var(--vscode-symbolIcon-structureForeground,#d4d4d4)}.query-bar pre .sql-tok.punct{color:var(--vscode-symbolIcon-punctForeground,#808080)}.query-hint{font-size:10px;color:var(--vscode-descriptionForeground,#9d9d9d);padding:0 14px 10px}.query-hint.warn{color:var(--vscode-charts-yellow,#e2c08d);font-weight:600}
 
 .section{padding-bottom:16px;margin-bottom:14px;border-bottom:1px solid var(--vscode-sideBarSectionHeader-border,#333)}
 .section:last-child{border:0;margin-bottom:0}
@@ -64,17 +64,19 @@ h2{font-size:11px;font-weight:600;text-transform:uppercase;color:var(--vscode-si
 .flow-label.exit{fill:var(--vscode-charts-green,#89d185)}
 
 .node{cursor:pointer}
-.node rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-widget-border,#454545);stroke-width:1;transition:stroke .15s,stroke-width .15s}
+.node rect{fill:var(--vscode-editorWidget-background,#252526);stroke:var(--vscode-widget-border,#454545);stroke-width:1;transition:stroke .15s,stroke-width .15s,height .25s ease,width .25s ease}
 .node.root rect{fill:var(--vscode-sideBarSectionHeader-background,#2d2d30);stroke:var(--vscode-charts-green,#89d185);stroke-width:2}
 .node.warning rect{stroke:var(--vscode-charts-yellow,#e2c08d);stroke-width:2}
 .node.critical rect{stroke:var(--vscode-charts-red,#f14c4c);stroke-width:2}
 .node.active rect{stroke:var(--vscode-focusBorder,#007fd4);stroke-width:2.5}
 
 .node text{fill:var(--vscode-editor-foreground,#cccccc)}
-.node text.node-icon{font-size:16px;fill:var(--vscode-textLink-foreground,#3794ff)}
+.node .node-icon path{fill:none;stroke:var(--vscode-textLink-foreground,#3794ff);stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}.node .node-icon path.node-icon-filled{fill:var(--vscode-textLink-foreground,#3794ff);stroke:none}
 .node text.operation{font-size:12px;font-weight:600}
 .node text.node-desc{font-size:10px;fill:var(--vscode-descriptionForeground,#9d9d9d)}
-.node text.resource{font-size:11px;fill:var(--vscode-textLink-foreground,#3794ff)}
+.node .node-table{font-size:13px;font-weight:600;fill:var(--vscode-textLink-foreground,#3794ff)}
+.node .node-label{font-size:10px;fill:var(--vscode-descriptionForeground,#9d9d9d)}
+.node text.node-detail{font-size:10px;fill:var(--vscode-descriptionForeground,#9d9d9d)}
 .node text.metric{font-size:10px;fill:var(--vscode-descriptionForeground,#9d9d9d);font-variant-numeric:tabular-nums}
 .node text.flag{font-size:11px;fill:var(--vscode-charts-yellow,#e2c08d);font-weight:700}.node.critical text.flag{fill:var(--vscode-charts-red,#f14c4c)}
 

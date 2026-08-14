@@ -1,0 +1,36 @@
+{
+  "query_block": {
+    "select_id": 1,
+    "cost_info": { "query_cost": "98240.77" },
+    "ordering_operation": {
+      "using_filesort": true,
+      "nested_loop": [
+        {
+          "table": {
+            "table_name": "orders",
+            "access_type": "ALL",
+            "possible_keys": ["created_at_idx", "customer_id_idx"],
+            "rows_examined_per_scan": 2500000,
+            "rows_produced_per_join": 2500000,
+            "filtered": "12.50",
+            "cost_info": { "read_cost": "80200.00", "eval_cost": "12000.00", "prefix_cost": "92200.00" },
+            "attached_condition": "(orders.created_at >= DATE_SUB(CURRENT_DATE, INTERVAL 90 DAY))"
+          }
+        },
+        {
+          "table": {
+            "table_name": "customers",
+            "access_type": "eq_ref",
+            "possible_keys": ["PRIMARY"],
+            "key": "PRIMARY",
+            "key_length": "4",
+            "ref": ["app.orders.customer_id"],
+            "rows_examined_per_scan": 1,
+            "rows_produced_per_join": 312500,
+            "filtered": "100.00"
+          }
+        }
+      ]
+    }
+  }
+}

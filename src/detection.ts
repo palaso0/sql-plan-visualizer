@@ -11,7 +11,7 @@ export class EngineDetector {
       if (/"Node Type"|"Plan"|"Plans"/.test(value)) {return { engine: Engine.PostgreSQL, version: this.version(value), confidence: 0.98, format: 'json' };}
     }
     if (/PLAN_TABLE_OUTPUT|\bDBMS_XPLAN\b|\|\s*Operation\s*\|/i.test(value)) {return { engine: Engine.Oracle, confidence: 0.95, format: 'text' };}
-    if (/EXPLAIN QUERY PLAN|\bSCAN\s+\w+|\bSEARCH\s+\w+\s+USING/i.test(value) && !/select_type|key_len/i.test(value)) {return { engine: Engine.SQLite, confidence: 0.9, format: 'text' };}
+    if (/EXPLAIN QUERY PLAN|^(?:[|`]\s*-+\s*)?(?:SCAN|SEARCH)\s+\w+/im.test(value) && !/select_type|key_len/i.test(value)) {return { engine: Engine.SQLite, confidence: 0.9, format: 'text' };}
     if (/select_type|key_len|Using (filesort|temporary)|query_block/i.test(value)) {return { engine: Engine.MySQL, confidence: 0.9, format: 'text' };}
     if (/QUERY PLAN|Seq Scan|Index Scan|Nested Loop|Hash Join|Bitmap Heap Scan/i.test(value)) {return { engine: Engine.PostgreSQL, confidence: 0.82, format: 'text' };}
     return undefined;

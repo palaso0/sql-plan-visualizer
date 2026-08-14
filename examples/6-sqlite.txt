@@ -1,0 +1,4 @@
+EXPLAIN QUERY PLAN
+|--SCAN customers
+|--SEARCH orders USING INDEX orders_customer_id_idx (customer_id=?)
+`--USE TEMP B-TREE FOR ORDER BY

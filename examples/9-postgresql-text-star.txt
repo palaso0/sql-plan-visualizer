@@ -1,0 +1,19 @@
+Finalize GroupAggregate  (cost=42345.12..42350.50 rows=850 width=104)
+  Group Key: p.product_name, c.customer_name
+  ->  Sort  (cost=42345.12..42347.25 rows=850 width=104)
+        Sort Key: (sum(f.amount)) DESC
+        ->  Gather  (cost=42100.00..42300.00 rows=850 width=104)
+              Workers Planned: 2
+              ->  Partial HashAggregate  (cost=41000.00..41100.00 rows=850 width=104)
+                    ->  Hash Join  (cost=9200.00..30100.00 rows=1200000 width=40)
+                          Hash Cond: (f.customer_id = c.id)
+                          ->  Hash Join  (cost=8800.00..22100.00 rows=1200000 width=28)
+                                Hash Cond: (f.product_id = p.id)
+                                ->  Seq Scan on fact_sales f  (cost=0.00..9600.00 rows=1200000 width=28)
+                                      Filter: (sale_date >= '2024-01-01'::date)
+                                ->  Hash  (cost=3800.00..3800.00 rows=1200 width=12)
+                                      ->  Seq Scan on dim_product p  (cost=0.00..3800.00 rows=1200 width=12)
+                          ->  Hash  (cost=250.00..250.00 rows=900 width=12)
+                                ->  Seq Scan on dim_customer c  (cost=0.00..250.00 rows=900 width=12)
+Planning Time: 0.5 ms
+Execution Time: 410.0 ms

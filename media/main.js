@@ -26,9 +26,9 @@
   const flat = root && childrenOf(root.id).length > 0 && maxDepth(root) <= 1;
 
   const cardWidth = 240;
-  let cardHeight = 100;
+  let cardHeight = 118;
   const gapXFlow = 30;
-  const gapV = 52;
+  const gapV = 84;
   const gapTree = 60;
   const padding = 60;
 
@@ -40,6 +40,7 @@
   let exitNode = root;
   let layoutMode = "vertical";
   const defaultLayout = "vertical";
+  let highlightClauseForNode = () => {};
 
   if (flat && root) {
     ordered = [...childrenOf(root.id), root];
@@ -169,8 +170,7 @@
     } else if (mode === "vertical" && root) {
       defaultPositions.forEach((point, id) => positions.set(id, { ...point }));
       totalWidth = defaultDimensions.width;
-      totalHeight =
-        defaultDimensions.height + (cardHeight - 100) * nodes.length;
+      totalHeight = defaultDimensions.height;
     }
   };
   applyLayout("vertical");
@@ -187,6 +187,26 @@
     if (v >= 1000000) return `${(v / 1000000).toFixed(1)}M`;
     if (v >= 1000) return `${(v / 1000).toFixed(1)}K`;
     return String(Math.round(v));
+  };
+  const fmtCost = (v) => {
+    if (!v) return "0";
+    if (v >= 1000000) return `${(v / 1000000).toFixed(2)}M`;
+    if (v >= 1000) return `${(v / 1000).toFixed(2)}K`;
+    return v % 1 === 0 ? String(v) : v.toFixed(2);
+  };
+  const measure = document.createElement("canvas").getContext("2d");
+  const fitTextTo = (text, font, maxWidth) => {
+    if (!text) return "";
+    measure.font = font;
+    if (measure.measureText(text).width <= maxWidth) return text;
+    let lo = 1;
+    let hi = text.length;
+    while (lo < hi) {
+      const mid = Math.ceil((lo + hi) / 2);
+      if (measure.measureText(`${text.slice(0, mid)}\u2026`).width <= maxWidth) lo = mid;
+      else hi = mid - 1;
+    }
+    return `${text.slice(0, lo)}\u2026`;
   };
 
   const kind = (id) => {
@@ -207,16 +227,115 @@
     return "ok";
   };
 
-  const ICONS = {
-    scan: "\u25A9",
-    "index-scan": "\u25A0",
-    join: "\u26D3",
-    sort: "\u2195",
-    aggregate: "\u03A3",
-    filter: "\u229B",
-    limit: "\u23EB",
-    materialize: "\u25C8",
-    other: "\u25CB",
+  const ICON_SHAPES = {
+    scan: [
+      { d: "M3 2.8h10v10.4H3z" },
+      { d: "M3 6.2h10" },
+      { d: "M6.4 6.2v7M9.7 6.2v7" },
+    ],
+    "index-scan": [
+      { d: "M2.6 2.8h9.4v5.4H2.6z" },
+      { d: "M2.6 5.4h9.4" },
+      { d: "M4.8 5.4v2.8" },
+      { d: "M8.6 10.8a2.2 2.2 0 1 0 4.4 0 2.2 2.2 0 1 0-4.4 0" },
+      { d: "M12.4 12.4l1.8 1.8" },
+    ],
+    join: [
+      { d: "M6 8a4 4 0 1 0 8 0 4 4 0 1 0-8 0z" },
+      { d: "M2 8a4 4 0 1 0 8 0 4 4 0 1 0-8 0z" },
+    ],
+    sort: [
+      { d: "M5.2 12.8v-7.4" },
+      { d: "M3.4 7.2L5.2 5.4l1.8 1.8" },
+      { d: "M10.8 3.2v7.4" },
+      { d: "M9 8.8L10.8 10.6l1.8-1.8" },
+    ],
+    aggregate: [
+      { d: "M3.2 10.4h2.2v2.9H3.2z", filled: true },
+      { d: "M6.9 8.2h2.2v5.1H6.9z", filled: true },
+      { d: "M10.6 5.8h2.2v7.5h-2.2z", filled: true },
+    ],
+    filter: [{ d: "M2.8 3.2h10.4l-3.6 4.6v5H6.4v-5z" }],
+    limit: [
+      { d: "M3.2 13h9.6" },
+      { d: "M8 2.8v8.4" },
+      { d: "M5.6 8.4L8 10.8l2.4-2.4" },
+    ],
+    materialize: [
+      { d: "M4 4.6v6.8c0 1.3 1.8 2.2 4 2.2s4-.9 4-2.2V4.6" },
+      { d: "M4 4.6c0 1.3 1.8 2.2 4 2.2s4-.9 4-2.2" },
+    ],
+    other: [
+      { d: "M8 2.4l1.2 4.4 4.4 1.2-4.4 1.2L8 13.6l-1.2-4.4L2.4 8l4.4-1.2z", filled: true },
+    ],
+    result: [
+      { d: "M2.6 8a5.4 5.4 0 1 0 10.8 0 5.4 5.4 0 1 0-10.8 0" },
+      { d: "M5.6 8.2l1.7 1.7 3.1-3.2" },
+    ],
+  };
+  const appendIcon = (parent, operation, isResult) => {
+    const shapes =
+      isResult ? ICON_SHAPES.result : ICON_SHAPES[operation] || ICON_SHAPES.other;
+    const g = make("g", {
+      class: "node-icon",
+      transform: "translate(12,13)",
+    });
+    shapes.forEach((shape) =>
+      g.appendChild(
+        make("path", {
+          d: shape.d,
+          ...(shape.filled ? { class: "node-icon-filled" } : {}),
+        }),
+      ),
+    );
+    parent.appendChild(g);
+  };
+    const escapeHtml = (value) =>
+    String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const tooltipHtml = (node, info) => {
+    const rows = [];
+    rows.push(`<div class="tooltip-header">${escapeHtml(info.label)}</div>`);
+    rows.push(`<div class="tooltip-desc">${escapeHtml(info.desc)}</div>`);
+    const add = (label, value) => {
+      if (value !== undefined && value !== "") {
+        rows.push(`<div class="tooltip-row"><span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b></div>`);
+      }
+    };
+    if (
+      (node.operation === "scan" || node.operation === "index-scan") &&
+      node.label &&
+      node.label.length <= 12 &&
+      node.label.toLowerCase() !== info.label.toLowerCase()
+    ) {
+      add("Access", node.label);
+    }
+    if (node.condition) add("Condition", node.condition);
+    if (node.table) add("Table", node.table);
+    if (node.index) add("Index", node.index + (node.usedKeyParts?.length ? ` (${node.usedKeyParts.join(", ")})` : ""));
+    if (node.possibleKeys?.length) add("Possible keys", node.possibleKeys.join(", "));
+    if (node.ref) add("Ref", node.ref);
+    if (node.filtered !== undefined) add("Filtered", `${node.filtered}%`);
+    if (node.estimatedRows) add("Estimated rows", node.estimatedRows.toLocaleString());
+    if (node.estimatedCost) add("Estimated cost", node.estimatedCost.toLocaleString());
+    if (node.inputRows) add("Rows examined", node.inputRows.toLocaleString());
+    if (node.actualRows) add("Actual rows", node.actualRows.toLocaleString());
+    if (node.actualTime) add("Actual time", `${node.actualTime} ms`);
+    if (node.filters?.length) add("Filters", node.filters.join(" | "));
+    if (node.extra) add("Extra", node.extra);
+    if (node.details?.length) {
+      rows.push(`<div class="tooltip-section">Details</div>`);
+      node.details.forEach((line) => rows.push(`<div class="tooltip-row"><span>${escapeHtml(line)}</span></div>`));
+    }
+    const issueList = issues.get(node.id);
+    if (issueList?.length) {
+      rows.push(`<div class="tooltip-section">Attention</div>`);
+      issueList.forEach((issue) =>
+        rows.push(
+          `<div class="tooltip-issue"><strong class="tooltip-${issue.severity}">${issue.severity === "critical" ? "Critical" : "Review"}</strong><span>${escapeHtml(issue.message)}</span><small>${escapeHtml(issue.hint || "")}</small></div>`,
+        ),
+      );
+    }
+    return rows.join("");
   };
   const OP_INFO = {
     scan: {
@@ -235,17 +354,51 @@
     materialize: { label: "Materialize", desc: "Stores intermediate results" },
     other: { label: "Operation", desc: "Executes a database operation" },
   };
+  const OP_EXPLAIN = {
+    "Seq Scan": { label: "Seq Scan", desc: "Reads the whole table row by row" },
+    "Index Scan": { label: "Index Scan", desc: "Looks up rows through an index" },
+    "Index Only Scan": { label: "Index Only Scan", desc: "Reads rows directly from the index (covering index)" },
+    "Bitmap Heap Scan": { label: "Bitmap Heap Scan", desc: "Reads heap pages listed in a bitmap built from an index" },
+    "Bitmap Index Scan": { label: "Bitmap Index Scan", desc: "Builds a bitmap of row locations from an index" },
+    "Nested Loop": { label: "Nested Loop", desc: "For each outer row, searches the inner input" },
+    "Hash Join": { label: "Hash Join", desc: "Hashes one input and probes it with the other" },
+    "Merge Join": { label: "Merge Join", desc: "Sorts both inputs, then merges matching rows" },
+    "Hash": { label: "Hash", desc: "Builds an in-memory hash table for a join" },
+    "Sort": { label: "Sort", desc: "Orders rows; may spill to disk" },
+    "WindowAgg": { label: "Window Aggregate", desc: "Computes window functions (ROW_NUMBER, RANK, COUNT/SUM per row group)" },
+    "GroupAggregate": { label: "Group Aggregate", desc: "Groups and aggregates rows after sorting" },
+    "HashAggregate": { label: "Hash Aggregate", desc: "Groups and aggregates rows with a hash table" },
+    "Aggregate": { label: "Aggregate", desc: "Groups or summarizes rows" },
+    "Limit": { label: "Limit", desc: "Stops after N rows" },
+    "Gather": { label: "Gather", desc: "Collects rows from parallel workers" },
+    "Gather Merge": { label: "Gather Merge", desc: "Collects sorted rows from parallel workers" },
+    "Append": { label: "Append", desc: "Combines results from several children (e.g., UNION ALL)" },
+    "Result": { label: "Result", desc: "Returns a constant or expression result" },
+    "Materialize": { label: "Materialize", desc: "Caches intermediate rows in memory" },
+    "Unique": { label: "Unique", desc: "Removes duplicate rows from sorted input" },
+    "Memoize": { label: "Memoize", desc: "Caches lookups for repeated keys" },
+    "ALL": { label: "Full Scan", desc: "Reads the whole table (no index)" },
+    "ref": { label: "Index Lookup", desc: "Looks up rows via a non-unique index" },
+    "eq_ref": { label: "Unique Index Lookup", desc: "Looks up one row via a unique index" },
+    "const": { label: "Constant Lookup", desc: "Resolves to a constant (one row)" },
+    "range": { label: "Index Range", desc: "Scans an index range" },
+    "index": { label: "Index Scan", desc: "Reads the whole index (covering)" },
+  };
 
   const getOpInfo = (node) => {
+    const explain = OP_EXPLAIN[node.label];
+    const base = OP_INFO[node.operation] || OP_INFO.other;
     if (node.id === "root" && node.operation === "other") {
+      if (explain) return { label: explain.label, desc: explain.desc };
       return {
         label: "Result",
         desc: `${plan.totals.nodeCount} operations \u00B7 ${plan.engine.engine}`,
-        icon: "\u25C9",
       };
     }
-    const base = OP_INFO[node.operation] || OP_INFO.other;
-    return { ...base, icon: ICONS[node.operation] || ICONS.other };
+    return {
+      label: explain ? explain.label : base.label,
+      desc: explain ? explain.desc : base.desc,
+    };
   };
 
   const defs = make("defs");
@@ -254,8 +407,8 @@
     viewBox: "0 0 10 10",
     refX: "5",
     refY: "5",
-    markerWidth: "7",
-    markerHeight: "7",
+    markerWidth: "10",
+    markerHeight: "10",
     markerUnits: "userSpaceOnUse",
     orient: "auto",
   });
@@ -297,6 +450,8 @@
   };
 
   const render = () => {
+    cancelAnimationFrame(scrollAnim);
+    zoomAnimation?.cancel();
     svg.replaceChildren();
     svg.appendChild(defs);
     svg.setAttribute("viewBox", `0 0 ${totalWidth} ${totalHeight}`);
@@ -345,6 +500,8 @@
             d: `M ${from.x + cardWidth} ${my} L ${to.x - 8} ${my}`,
             "stroke-width": String(strokeW),
             "marker-end": "url(#arrow)",
+            "data-from": ordered[i].id,
+            "data-to": ordered[i + 1].id,
           },
           ordered[i].estimatedRows,
         );
@@ -373,6 +530,8 @@
                 : `M ${fx} ${fy} C ${midY} ${fy}, ${midY} ${ty}, ${tx} ${ty}`,
               "stroke-width": String(strokeW),
               "marker-end": "url(#arrow)",
+              "data-from": node.id,
+              "data-to": node.parentId,
             },
             node.estimatedRows,
           );
@@ -394,35 +553,63 @@
         make("rect", { width: cardWidth, height: cardHeight, rx: "4" }),
       );
 
-      const icon = make("text", { x: "14", y: "27", class: "node-icon" });
-      icon.textContent = info.icon;
-      g.appendChild(icon);
+      g.setAttribute("aria-label", `${info.label}. ${info.desc}`);
+
+      appendIcon(g, node.operation, isRoot && node.operation === "other");
 
       const opLabel = make("text", { x: "38", y: "27", class: "operation" });
-      opLabel.textContent = info.label.slice(0, 24);
+      opLabel.textContent = fitTextTo(info.label, "600 12px Arial, sans-serif", 190);
       g.appendChild(opLabel);
 
-      const desc = make("text", { x: "14", y: "48", class: "node-desc" });
-      desc.textContent = info.desc.slice(0, 36);
-      g.appendChild(desc);
+      if (node.table) {
+        const table = make("text", { x: "14", y: "47" });
+        const prefix = make("tspan", { class: "node-label" });
+        prefix.textContent = "table: ";
+        const name = make("tspan", { class: "node-table" });
+        name.textContent = fitTextTo(node.table, "600 13px Arial, sans-serif", 196);
+        table.appendChild(prefix);
+        table.appendChild(name);
+        g.appendChild(table);
+      } else {
+        const desc = make("text", { x: "14", y: "47", class: "node-desc" });
+        desc.textContent = fitTextTo(node.condition || info.desc, "10px Arial, sans-serif", 218);
+        g.appendChild(desc);
+      }
 
-      const resource = make("text", { x: "14", y: "66", class: "resource" });
-      resource.textContent = (
-        node.table
-          ? `\u25A4 ${node.table}${node.index ? ` \u00B7 ${node.index}` : ""}`
-          : ""
-      ).slice(0, 36);
-      g.appendChild(resource);
+      const detail = make("text", { x: "14", y: "63", class: "node-detail" });
+      const detailParts = [];
+      if (node.index) detailParts.push(`index ${node.index}`);
+      if (node.ref) detailParts.push(`ref ${node.ref}`);
+      else if (node.possibleKeys?.length)
+        detailParts.push(`possible keys: ${node.possibleKeys.join(", ")}`);
+      detail.textContent = fitTextTo(detailParts.join("  "), "10px Arial, sans-serif", 218);
+      if (detail.textContent) g.appendChild(detail);
 
-      const metric = make("text", { x: "14", y: "86", class: "metric" });
-      const parts = [
-        `${fmt(node.estimatedRows)} rows`,
-        `${fmt(node.estimatedCost)} cost`,
-      ];
-      if (node.actualTime) parts.push(`${node.actualTime.toFixed(1)} ms`);
-      if (node.actualRows) parts.push(`${fmt(node.actualRows)} actual`);
-      metric.textContent = parts.join("   ");
+      if (node.condition && node.table) {
+        const cond = make("text", { x: "14", y: "79", class: "node-detail" });
+        cond.textContent = fitTextTo(node.condition, "10px Arial, sans-serif", 218);
+        g.appendChild(cond);
+      } else if (node.filtered !== undefined && node.filtered < 100) {
+        const filt = make("text", { x: "14", y: "79", class: "node-detail" });
+        filt.textContent = `${node.filtered}% filtered`;
+        g.appendChild(filt);
+      }
+
+      const metric = make("text", { x: "14", y: "95", class: "metric" });
+      metric.textContent = fitTextTo(
+        `${fmt(node.estimatedRows)} rows   ${fmtCost(node.estimatedCost)} cost`,
+        "10px Arial, sans-serif",
+        218,
+      );
       g.appendChild(metric);
+      if (node.actualTime || node.actualRows) {
+        const actual = make("text", { x: "14", y: "108", class: "metric" });
+        const actualParts = [];
+        if (node.actualTime) actualParts.push(`${node.actualTime.toFixed(1)} ms`);
+        if (node.actualRows) actualParts.push(`${fmt(node.actualRows)} actual`);
+        actual.textContent = actualParts.join("   ");
+        g.appendChild(actual);
+      }
 
       if (issues.has(node.id)) {
         const flag = make("text", {
@@ -440,35 +627,32 @@
               `${issue.severity}: ${issue.message}${issue.hint ? ` ${issue.hint}` : ""}`,
           )
           .join(" | ");
-        g.setAttribute("title", explanation);
         g.setAttribute("aria-label", `${info.label}. ${explanation}`);
-        g.addEventListener("mouseenter", (event) => {
-          tooltip.innerHTML = issues
-            .get(node.id)
-            .map(
-              (issue) =>
-                `<div class="tooltip-issue"><strong class="tooltip-${issue.severity}">${issue.severity === "critical" ? "Critical" : "Review"}</strong><span>${issue.message}</span><small>${issue.hint || ""}</small></div>`,
-            )
-            .join("");
-          tooltip.classList.add("visible");
-          tooltip.style.left = `${event.clientX + 14}px`;
-          tooltip.style.top = `${event.clientY + 14}px`;
-        });
-        g.addEventListener("mousemove", (event) => {
-          tooltip.style.left = `${event.clientX + 14}px`;
-          tooltip.style.top = `${event.clientY + 14}px`;
-        });
-        g.addEventListener("mouseleave", () =>
-          tooltip.classList.remove("visible"),
-        );
       }
+
+      g.addEventListener("mouseenter", (event) => {
+        tooltip.innerHTML = tooltipHtml(node, info);
+        tooltip.classList.add("visible");
+        tooltip.style.left = `${event.clientX + 14}px`;
+        tooltip.style.top = `${event.clientY + 14}px`;
+      });
+      g.addEventListener("mousemove", (event) => {
+        tooltip.style.left = `${event.clientX + 14}px`;
+        tooltip.style.top = `${event.clientY + 14}px`;
+      });
+      g.addEventListener("mouseleave", () =>
+        tooltip.classList.remove("visible"),
+      );
 
       g.addEventListener("click", () => {
         document
           .querySelectorAll(".node")
           .forEach((n) => n.classList.remove("active"));
         g.classList.add("active");
+        highlightClauseForNode(node.id);
       });
+      g.addEventListener("mouseenter", () => highlightClauseForNode(node.id));
+      g.addEventListener("mouseleave", () => clearSqlClauses());
       let drag;
       g.addEventListener("pointerdown", (event) => {
         event.stopPropagation();
@@ -499,20 +683,76 @@
   };
 
   let scale = 1;
+  let zoomAnimation;
+  let scrollAnim;
+  const currentScale = () => {
+    const t = getComputedStyle(svg).transform;
+    if (!t || t === "none") return scale;
+    return new DOMMatrixReadOnly(t).a;
+  };
   const applyScale = () => {
-    svg.style.transform = `scale(${scale})`;
+    const margin = Math.max(0, (panel.clientWidth - totalWidth * scale) / 2);
+    svg.style.transform = `translate(${margin}px, 0) scale(${scale})`;
     svg.style.transformOrigin = "top left";
-    svg.style.marginLeft = `${Math.max(0, (panel.clientWidth - totalWidth * scale) / 2 / scale)}px`;
     svg.style.marginTop = "0px";
+  };
+  const zoomTo = (next) => {
+    const from = currentScale();
+    if (next === from) return;
+    cancelAnimationFrame(scrollAnim);
+    zoomAnimation?.cancel();
+    const viewW = panel.clientWidth;
+    const viewH = panel.clientHeight;
+    const marginFrom = Math.max(0, (viewW - totalWidth * from) / 2);
+    const marginTo = Math.max(0, (viewW - totalWidth * next) / 2);
+    const cx = (viewW / 2 - marginFrom + panel.scrollLeft) / from;
+    const cy = (viewH / 2 + panel.scrollTop) / from;
+    const scrollLeft0 = panel.scrollLeft;
+    const scrollTop0 = panel.scrollTop;
+    const scrollLeft1 = Math.max(0, marginTo + cx * next - viewW / 2);
+    const scrollTop1 = Math.max(0, cy * next - viewH / 2);
+    const animation = svg.animate(
+      [
+        { transform: `translate(${marginFrom}px, 0) scale(${from})` },
+        { transform: `translate(${marginTo}px, 0) scale(${next})` },
+      ],
+      {
+        duration: 180,
+        easing: "cubic-bezier(0.645, 0.045, 0.355, 1)",
+        fill: "forwards",
+      },
+    );
+    zoomAnimation = animation;
+    const duration = 180;
+    const start = performance.now();
+    const ease = (t) =>
+      t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const e = ease(t);
+      panel.scrollLeft = scrollLeft0 + (scrollLeft1 - scrollLeft0) * e;
+      panel.scrollTop = scrollTop0 + (scrollTop1 - scrollTop0) * e;
+      if (t < 1) scrollAnim = requestAnimationFrame(step);
+    };
+    scrollAnim = requestAnimationFrame(step);
+    animation.addEventListener(
+      "finish",
+      () => {
+        animation.cancel();
+        scale = next;
+        applyScale();
+        panel.scrollLeft = scrollLeft1;
+        panel.scrollTop = scrollTop1;
+      },
+      { once: true },
+    );
   };
 
   document.getElementById("zoom-in")?.addEventListener("click", () => {
-    scale = Math.min(2, scale + 0.1);
-    applyScale();
+    zoomTo(Math.min(2, scale + 0.1));
   });
   document.getElementById("zoom-out")?.addEventListener("click", () => {
-    scale = Math.max(0.5, scale - 0.1);
-    applyScale();
+    zoomTo(Math.max(0.5, scale - 0.1));
   });
   document.getElementById("zoom-fit")?.addEventListener("click", fitToPanel);
   const panel = svg.parentElement;
@@ -558,7 +798,7 @@
   document.getElementById("export")?.addEventListener("click", () => {
     const clone = svg.cloneNode(true);
     const style = document.createElementNS(ns, "style");
-    style.textContent = `.node text{font-family:Arial,sans-serif;fill:#cccccc}.node>rect{fill:#252526;stroke:#454545;stroke-width:1}.node.root>rect{fill:#2d2d30;stroke:#89d185;stroke-width:2}.node.warning>rect{stroke:#e2c08d;stroke-width:2}.node.critical>rect{stroke:#f14c4c;stroke-width:2}.node text.node-icon{font-size:16px;fill:#75beff}.node text.operation{font-size:12px;font-weight:600}.node text.node-desc{font-size:10px;fill:#9d9d9d}.node text.resource{font-size:11px;fill:#75beff}.node text.metric{font-size:10px;fill:#9d9d9d}.node text.flag{font-size:11px;fill:#e2c08d;font-weight:700}.node.critical text.flag{fill:#f14c4c}.node text.flow-label{font-size:8px;fill:#9d9d9d;font-weight:700}.node text.flow-value{font-size:8px;fill:#cccccc}.node .flow-bar-bg{fill:#454545;stroke:none}.node .flow-bar{fill:#75beff;stroke:none}.node .flow-input{fill:#e2c08d}.node .flow-output{fill:#89d185}.edge{fill:none;stroke:#75beff}.flow-particle{fill:#75beff}.flow-label{font-family:Arial,sans-serif;font-size:11px;font-weight:700}.flow-label.entry{fill:#75beff}.flow-label.exit{fill:#89d185}`;
+    style.textContent = `.node text{font-family:Arial,sans-serif;fill:#cccccc}.node>rect{fill:#252526;stroke:#454545;stroke-width:1}.node.root>rect{fill:#2d2d30;stroke:#89d185;stroke-width:2}.node.warning>rect{stroke:#e2c08d;stroke-width:2}.node.critical>rect{stroke:#f14c4c;stroke-width:2}.node .node-icon path{fill:none;stroke:#75beff;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}.node .node-icon path.node-icon-filled{fill:#75beff;stroke:none}.node text.operation{font-size:12px;font-weight:600}.node text.node-desc{font-size:10px;fill:#9d9d9d}.node .node-table{font-size:13px;font-weight:600;fill:#75beff}.node .node-label{font-size:10px;fill:#9d9d9d}.node text.node-detail{font-size:10px;fill:#9d9d9d}.node text.metric{font-size:10px;fill:#9d9d9d}.node text.flag{font-size:11px;fill:#e2c08d;font-weight:700}.node.critical text.flag{fill:#f14c4c}.node text.flow-label{font-size:8px;fill:#9d9d9d;font-weight:700}.node text.flow-value{font-size:8px;fill:#cccccc}.node .flow-bar-bg{fill:#454545;stroke:none}.node .flow-bar{fill:#75beff;stroke:none}.node .flow-input{fill:#e2c08d}.node .flow-output{fill:#89d185}.edge{fill:none;stroke:#75beff}.flow-particle{fill:#75beff}.flow-label{font-family:Arial,sans-serif;font-size:11px;font-weight:700}.flow-label.entry{fill:#75beff}.flow-label.exit{fill:#89d185}`;
     clone.insertBefore(style, clone.firstChild);
     clone.removeAttribute("style");
     const bounds = svg.getBBox();
@@ -606,7 +846,7 @@
     `${plan.engine.engine}${plan.engine.version ? ` ${plan.engine.version}` : ""} \u00B7 ${plan.totals.nodeCount} operations`;
 
   document.getElementById("metrics").innerHTML =
-    `<div class="stat"><strong>${fmt(plan.totals.estimatedCost)}</strong><span>total cost</span></div>` +
+    `<div class="stat"><strong>${fmtCost(plan.totals.estimatedCost)}</strong><span>total cost</span></div>` +
     `<div class="stat"><strong>${fmt(plan.totals.estimatedRows)}</strong><span>peak rows</span></div>` +
     `<div class="stat"><strong>${plan.issues.length}</strong><span>warnings</span></div>` +
     `<div class="stat"><strong>${plan.totals.nodeCount}</strong><span>operations</span></div>`;
@@ -631,8 +871,386 @@
       document
         .querySelector(`[data-id="${item.dataset.target}"]`)
         ?.classList.add("active");
+      highlightClauseForNode(item.dataset.target);
     }),
   );
+
+  const sqlPanel = document.getElementById("sql-query");
+  const clearSqlClauses = () =>
+    document
+      .querySelectorAll(".sql-clause")
+      .forEach((el) => el.classList.remove("active"));
+  const SQL_KEYWORDS = new Set(
+    "SELECT FROM WHERE JOIN LEFT RIGHT INNER OUTER FULL CROSS NATURAL ON GROUP BY HAVING ORDER LIMIT OFFSET AS AND OR NOT IN IS NULL BETWEEN LIKE EXISTS CASE WHEN THEN ELSE END DISTINCT ALL UNION EXCEPT INTERSECT ASC DESC INSERT UPDATE DELETE CREATE ALTER DROP TABLE INDEX VIEW PRIMARY KEY FOREIGN REFERENCES CONSTRAINT COUNT SUM AVG MIN MAX COALESCE CAST INTERVAL CURRENT_DATE CURRENT_TIMESTAMP DATE_SUB DATE_ADD NOW ROUND ABS UPPER LOWER SUBSTRING CONCAT IFNULL NULLIF OVER PARTITION WINDOW WITH RECURSIVE RETURNING VALUES DEFAULT UNIQUE CHECK TRIGGER ROLLUP CUBE FETCH FIRST NEXT ROW ROWS ONLY".split(/\s+/),
+  );
+  const tokenizeSql = (text) => {
+    const tokens = [];
+    const re = /('(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`|--[^\n]*|\/\*[\s\S]*?\*\/|\b\d+(?:\.\d+)?\b|[A-Za-z_][A-Za-z0-9_]*|[()]|[.,;]|[<>=!]+|[-+*/])/g;
+    let last = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) tokens.push({ type: "plain", text: text.slice(last, m.index), start: last });
+      const token = m[0];
+      let type = "plain";
+      if (token[0] === "'" || token[0] === '"' || token[0] === "`") type = "string";
+      else if (token.startsWith("--") || token.startsWith("/*")) type = "comment";
+      else if (/^\d/.test(token)) type = "number";
+      else if (/^[A-Za-z_]/.test(token)) type = SQL_KEYWORDS.has(token.toUpperCase()) ? "keyword" : "identifier";
+      else if (token === "(" || token === ")") type = "paren";
+      else if (token === "," || token === "." || token === ";") type = "punct";
+      else type = "operator";
+      tokens.push({ type, text: token, start: m.index });
+      last = re.lastIndex;
+    }
+    if (last < text.length) tokens.push({ type: "plain", text: text.slice(last), start: last });
+    return tokens;
+  };
+  const appendHighlighted = (parent, text) => {
+    tokenizeSql(text).forEach((token) => {
+      if (token.type === "plain") parent.appendChild(document.createTextNode(token.text));
+      else {
+        const span = document.createElement("span");
+        span.className = `sql-tok ${token.type}`;
+        span.textContent = token.text;
+        parent.appendChild(span);
+      }
+    });
+  };
+  if (sqlPanel) {
+    if (plan.sql) {
+      const parseClauseSegments = (sql) => {
+        const tokens = tokenizeSql(sql);
+        const sig = tokens.filter(
+          (t) => t.type === "keyword" || t.type === "paren" || t.type === "punct",
+        );
+        const segs = [];
+        const frames = [{ pending: null, open: 0, parenStart: -1 }];
+        const top = () => frames[frames.length - 1];
+        const finalize = (frame, end) => {
+          if (frame.pending) {
+            frame.pending.end = end;
+            segs.push(frame.pending);
+            frame.pending = null;
+          }
+        };
+        for (let i = 0; i < sig.length; i += 1) {
+          const tok = sig[i];
+          if (tok.text === "(") {
+            const next = sig[i + 1];
+            if (next && next.type === "keyword" && /^(SELECT|WITH)$/i.test(next.text)) {
+              frames.push({ pending: null, open: 0, parenStart: tok.start });
+            } else {
+              top().open += 1;
+            }
+            continue;
+          }
+          if (tok.text === ")") {
+            const frame = top();
+            frame.open -= 1;
+            if (frame.parenStart >= 0 && frame.open < 0) {
+              const inner = { start: frame.parenStart + 1, end: tok.start };
+              finalize(frame, tok.start);
+              frames.pop();
+              const pending = top().pending;
+              if (pending) {
+                pending.exclusions = pending.exclusions || [];
+                pending.exclusions.push(inner);
+              }
+            }
+            continue;
+          }
+          if (tok.type === "keyword") {
+            const word = tok.text.toUpperCase();
+            let key;
+            let consumed = 0;
+            if (word === "GROUP" || word === "ORDER") {
+              const next = sig[i + 1];
+              if (next && next.type === "keyword" && next.text.toUpperCase() === "BY") {
+                key = `${word.toLowerCase()} by`;
+                consumed = 1;
+              } else {
+                continue;
+              }
+            } else if (/^(SELECT|FROM|WHERE|HAVING|LIMIT|JOIN)$/.test(word)) {
+              key = word.toLowerCase();
+            } else {
+              continue;
+            }
+            const frame = top();
+            if (frame.open > 0) continue;
+            let start = tok.start;
+            if (key === "join") {
+              let j = i - 1;
+              while (j >= 0 && sig[j].type === "keyword" && /^(LEFT|RIGHT|INNER|OUTER|FULL|CROSS|NATURAL)$/i.test(sig[j].text)) j -= 1;
+              start = sig[j + 1] ? sig[j + 1].start : tok.start;
+            }
+            finalize(frame, start);
+            frame.pending = { key, start, exclusions: [] };
+            i += consumed;
+            continue;
+          }
+          if (tok.text === ";" && frames.length === 1 && top().open === 0) {
+            finalize(top(), tok.start + 1);
+          }
+        }
+        finalize(top(), sql.length);
+        segs.sort((a, b) => a.start - b.start);
+        return segs.map((seg) => ({
+          key: seg.key,
+          start: seg.start,
+          end: seg.end,
+          full: sql.slice(seg.start, seg.end),
+          exclusions: seg.exclusions || [],
+        }));
+      };
+
+      const segs = parseClauseSegments(plan.sql);
+      const segByKey = {};
+      segs.forEach((seg, idx) => {
+        segByKey[seg.key] = segByKey[seg.key] || [];
+        segByKey[seg.key].push(idx);
+      });
+      const segmentParts = (seg) => {
+        const parts = [];
+        let cursor = seg.start;
+        const ex = [...seg.exclusions].sort((a, b) => a.start - b.start);
+        for (const r of ex) {
+          if (r.end <= seg.start || r.start >= seg.end) continue;
+          if (r.start > cursor) parts.push(plan.sql.slice(cursor, r.start));
+          parts.push("\u2026");
+          cursor = Math.max(cursor, r.end);
+        }
+        if (cursor < seg.end) parts.push(plan.sql.slice(cursor, seg.end));
+        return parts;
+      };
+      const formatClause = (seg) => {
+        const raw = segmentParts(seg)
+          .join(" ")
+          .replace(/\s+/g, " ")
+          .trim();
+        if (!raw) return [];
+        const words = raw.split(" ");
+        const keyWords = seg.key.split(" ");
+        for (let i = 0; i < keyWords.length && i < words.length; i += 1) {
+          if (words[i].toLowerCase() === keyWords[i]) words[i] = words[i].toUpperCase();
+        }
+        const text = words.join(" ");
+        if (seg.key === "where" || seg.key === "having") {
+          return text.split(/\s+(?=AND\b|OR\b)/i);
+        }
+        return [text];
+      };
+      const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const wordIn = (text, name) => {
+        const n = String(name);
+        if (!n) return false;
+        return new RegExp(`\\b${escapeRegExp(n)}\\b`, "i").test(text);
+      };
+      const tablesOf = (node, acc = new Set()) => {
+        if (node.table) acc.add(node.table);
+        (node.children || []).forEach((child) => tablesOf(child, acc));
+        return acc;
+      };
+      const bestForTables = (tables, preferred) => {
+        const shortest = (list) => {
+          let best;
+          for (const i of list) {
+            if (best === undefined || segs[i].full.length < segs[best].full.length) best = i;
+          }
+          return best;
+        };
+        const preferredMatches = [];
+        const otherMatches = [];
+        segs.forEach((seg, idx) => {
+          let found = false;
+          for (const table of tables) {
+            if (wordIn(seg.full, table)) {
+              found = true;
+              break;
+            }
+          }
+          if (!found) return;
+          if (preferred.includes(seg.key)) preferredMatches.push(idx);
+          else otherMatches.push(idx);
+        });
+        return shortest(preferredMatches) ?? shortest(otherMatches);
+      };
+      const segmentForNode = (node) => {
+        if (node.id === "root") return segByKey.select ? segByKey.select[0] : undefined;
+        const tables = tablesOf(node);
+        const firstKey = (key) => (segByKey[key] ? segByKey[key][0] : undefined);
+        const firstSelect = () => firstKey("select");
+        const op = node.operation;
+        if (op === "scan" || op === "index-scan") {
+          if (node.table) {
+            const idx = bestForTables(new Set([node.table]), ["from", "join", "where", "having"]);
+            if (idx !== undefined) return idx;
+          }
+          return firstKey("from") ?? firstSelect();
+        }
+        if (op === "join") {
+          const idx = bestForTables(tables, ["join", "where"]);
+          if (idx !== undefined) return idx;
+          return firstKey("join") ?? firstKey("where") ?? firstSelect();
+        }
+        if (op === "sort") return firstKey("order by") ?? firstKey("group by") ?? firstSelect();
+        if (op === "aggregate") return firstKey("group by") ?? firstSelect();
+        if (op === "limit") return firstKey("limit");
+        if (op === "filter") {
+          const idx = bestForTables(tables, ["where", "having"]);
+          if (idx !== undefined) return idx;
+          return firstKey("where") ?? firstKey("having") ?? firstSelect();
+        }
+        const idx = bestForTables(tables, []);
+        return idx ?? firstSelect();
+      };
+      const segmentNodes = {};
+      const nodeSegment = new Map();
+      const highlightNodesFor = (idx, active) => {
+        document
+          .querySelectorAll(".node")
+          .forEach((n) => n.classList.remove("active"));
+        if (active) {
+          (segmentNodes[idx] || []).forEach((id) =>
+            document.querySelector(`[data-id="${id}"]`)?.classList.add("active"),
+          );
+        }
+      };
+      const planTables = new Set();
+      nodes.forEach((n) => {
+        if (n.table) planTables.add(n.table.toLowerCase());
+      });
+      const sqlTables = new Set();
+      const NON_TABLE_WORDS = new Set([
+        "from", "join", "on", "using", "as", "and", "or", "cross", "left",
+        "right", "inner", "outer", "full", "natural", "asc", "desc",
+      ]);
+      segs.forEach((seg) => {
+        if (seg.key !== "from" && seg.key !== "join") return;
+        tokenizeSql(segmentParts(seg).join(" ")).forEach((tok) => {
+          const lower = tok.text.toLowerCase();
+          if (
+            (tok.type === "identifier" || tok.type === "keyword") &&
+            !NON_TABLE_WORDS.has(lower)
+          ) {
+            sqlTables.add(lower);
+          } else if (tok.type === "string") {
+            const name = tok.text.slice(1, -1).toLowerCase();
+            if (/^[a-z_][\w]*$/.test(name)) sqlTables.add(name);
+          }
+        });
+      });
+      const sqlTablesList = [...sqlTables];
+      const mismatched =
+        sqlTablesList.length > 0 &&
+        planTables.size > 0 &&
+        !sqlTablesList.some((t) => planTables.has(t));
+
+      const sqlSigTokens = tokenizeSql(plan.sql).filter(
+        (t) => t.type !== "plain" && t.type !== "comment",
+      );
+      const hasPgMarker = (() => {
+        for (let i = 0; i < sqlSigTokens.length; i += 1) {
+          const t = sqlSigTokens[i];
+          if (
+            t.type === "keyword" &&
+            t.text.toUpperCase() === "INTERVAL" &&
+            sqlSigTokens[i + 1] &&
+            sqlSigTokens[i + 1].type === "string" &&
+            /[a-z]/i.test(sqlSigTokens[i + 1].text)
+          ) {
+            return true;
+          }
+        }
+        return (
+          /\bILIKE\b/i.test(plan.sql) ||
+          /::\s*(?:integer|bigint|text|varchar|numeric|bool|boolean|timestamp|date)\b/i.test(plan.sql)
+        );
+      })();
+      const hasMySqlMarker =
+        sqlSigTokens.some(
+          (t) => t.type === "string" && t.text.startsWith("`"),
+        ) ||
+        sqlSigTokens.some(
+          (t) => t.type === "keyword" && /^(DATE_SUB|DATE_ADD)$/i.test(t.text),
+        );
+      const planEngine = String(plan.engine.engine || "").toUpperCase();
+      const dialectIssue =
+        planEngine === "MYSQL" && hasPgMarker
+          ? "PostgreSQL-style syntax (quoted INTERVAL, :: casts or ILIKE)"
+          : planEngine === "POSTGRESQL" && hasMySqlMarker
+            ? "MySQL-style syntax (backticks or DATE_SUB/DATE_ADD)"
+            : null;
+
+      sqlPanel.textContent = "";
+      const hint = document.getElementById("query-hint");
+      if (mismatched) {
+        if (hint) {
+          hint.textContent = `Warning: this SQL doesn't seem to match the plan. Tables in the SQL (${sqlTablesList.slice(0, 4).join(", ")}${sqlTablesList.length > 4 ? "…" : ""}) were not found in the plan (${[...planTables].slice(0, 4).join(", ")}${planTables.size > 4 ? "…" : ""}). Clause highlighting is disabled.`;
+          hint.classList.add("warn");
+        }
+        sqlPanel.appendChild(document.createTextNode(plan.sql));
+      } else {
+        if (dialectIssue) {
+          if (hint) {
+            hint.textContent = `Warning: the SQL uses ${dialectIssue}, but the plan is ${planEngine}. Clause highlighting may not reflect the actual plan.`;
+            hint.classList.add("warn");
+          }
+        } else if (hint) {
+          hint.textContent = "Hover a clause or plan node to see the mapping.";
+        }
+        if (!segs.length) {
+          sqlPanel.appendChild(document.createTextNode(plan.sql));
+        } else {
+        segs.forEach((seg, idx) => {
+          formatClause(seg).forEach((line) => {
+            const span = document.createElement("span");
+            span.className = "sql-clause";
+            span.dataset.seg = String(idx);
+            span.dataset.clause = seg.key;
+            span.title = `Show plan nodes for: ${seg.key}`;
+            appendHighlighted(span, line);
+            span.addEventListener("mouseenter", () => {
+              clearSqlClauses();
+              span.classList.add("active");
+              highlightNodesFor(idx, true);
+            });
+            span.addEventListener("mouseleave", () => {
+              clearSqlClauses();
+              highlightNodesFor(idx, false);
+            });
+            span.addEventListener("click", () => {
+              clearSqlClauses();
+              span.classList.add("active");
+              highlightNodesFor(idx, true);
+            });
+            sqlPanel.appendChild(span);
+            sqlPanel.appendChild(document.createTextNode("\n"));
+          });
+        });
+        nodes.forEach((node) => {
+          const idx = segmentForNode(node);
+          if (idx !== undefined) {
+            nodeSegment.set(node.id, idx);
+            if (!segmentNodes[idx]) segmentNodes[idx] = new Set();
+            segmentNodes[idx].add(node.id);
+          }
+        });
+      }
+      highlightClauseForNode = (nodeId) => {
+        const idx = nodeSegment.get(nodeId);
+        clearSqlClauses();
+        if (idx !== undefined) {
+          document
+            .querySelectorAll(`.sql-clause[data-seg="${idx}"]`)
+            .forEach((el) => el.classList.add("active"));
+        }
+      };
+      }
+    } else {
+      document.getElementById("query-panel")?.remove();
+    }
+  }
 
   const executionOrder = [];
   const collectExecution = (node) => {
@@ -656,6 +1274,13 @@
     ...nodes.map((node) => Math.max(flowFor(node).input, flowFor(node).output)),
   );
   let flowAnimation;
+  const flowHeight = 138;
+  const groupPos = (el) => {
+    const m = /translate\(([-\d.]+),([-\d.]+)\)/.exec(
+      (el && el.getAttribute("transform")) || "",
+    );
+    return m ? { x: parseFloat(m[1]), y: parseFloat(m[2]) } : null;
+  };
   const showFlow = (node) => {
     const group = document.querySelector(`[data-id="${node.id}"]`);
     if (!group) return;
@@ -664,17 +1289,43 @@
       item.classList.remove("flow-active");
     });
     group.classList.add("flow-active");
-    group.querySelectorAll(".flow-bar,.flow-bar-bg,.flow-label,.flow-value").forEach((child) => child.remove());
-    group.querySelector("rect")?.setAttribute("height", "128");
-    const metric = group.querySelector(".metric");
+    group.querySelectorAll(".flow-bar,.flow-bar-bg,.flow-label,.flow-value,.metric,.node-detail").forEach((child) => child.remove());
+    const rect = group.querySelector("rect");
+    rect?.style.setProperty("height", `${flowHeight}px`);
+    const pos = groupPos(group);
+    if (layoutMode === "vertical" && pos) {
+      document.querySelectorAll(`.edge[data-from="${node.id}"]`).forEach((el) => {
+        const target = groupPos(document.querySelector(`[data-id="${el.dataset.to}"]`));
+        if (!target) return;
+        const fx = pos.x + cardWidth / 2;
+        const fy = pos.y + flowHeight;
+        const tx = target.x + cardWidth / 2;
+        const ty = target.y;
+        const midY = (fy + ty) / 2;
+        el.setAttribute(
+          "d",
+          `M ${fx} ${fy} C ${fx} ${midY}, ${tx} ${midY}, ${tx} ${ty - 8}`,
+        );
+      });
+    }
+    if (exitNode && exitNode.id === node.id && pos) {
+      document
+        .querySelector(".flow-label.exit")
+        ?.setAttribute("y", String(pos.y + flowHeight + 20));
+    }
     const flow = flowFor(node);
-    if (metric)
-      metric.textContent = `${flow.inputText} rows in  →  ${fmt(flow.output)} rows out`;
-    const inputLabel = make("text", { x: "14", y: "103", class: "flow-label" });
+    const flowLine = (y, text) => {
+      const el = make("text", { x: "14", y: String(y), class: "metric flow-metric" });
+      el.textContent = text;
+      group.appendChild(el);
+    };
+    flowLine(80, `${flow.inputText} rows in`);
+    flowLine(92, `→ ${fmt(flow.output)} rows out`);
+    const inputLabel = make("text", { x: "14", y: "109", class: "flow-label" });
     inputLabel.textContent = "IN";
     const outputLabel = make("text", {
       x: "14",
-      y: "118",
+      y: "123",
       class: "flow-label",
     });
     outputLabel.textContent = "OUT";
@@ -682,21 +1333,21 @@
     const outputPercent = Math.round((flow.output / maxVolume) * 100);
     const inputValue = make("text", {
       x: "224",
-      y: "103",
+      y: "109",
       class: "flow-value",
       "text-anchor": "end",
     });
     inputValue.textContent = `${fmt(flow.input)} rows · ${inputPercent}%`;
     const outputValue = make("text", {
       x: "224",
-      y: "118",
+      y: "123",
       class: "flow-value",
       "text-anchor": "end",
     });
     outputValue.textContent = `${fmt(flow.output)} rows · ${outputPercent}%`;
     const inputBackground = make("rect", {
       x: "38",
-      y: "98",
+      y: "104",
       width: "100",
       height: "5",
       rx: "2.5",
@@ -704,7 +1355,7 @@
     });
     const outputBackground = make("rect", {
       x: "38",
-      y: "113",
+      y: "118",
       width: "100",
       height: "5",
       rx: "2.5",
@@ -712,7 +1363,7 @@
     });
     const inputBar = make("rect", {
       x: "38",
-      y: "98",
+      y: "104",
       width: "0",
       height: "5",
       rx: "2.5",
@@ -720,7 +1371,7 @@
     });
     const outputBar = make("rect", {
       x: "38",
-      y: "113",
+      y: "118",
       width: "0",
       height: "5",
       rx: "2.5",
@@ -754,53 +1405,88 @@
 
   let timer;
   let playbackIndex = 0;
-  document.getElementById("play").addEventListener("click", (event) => {
-    if (event.target.dataset.playing === "true") {
+  let playing = false;
+  const playButton = document.getElementById("play");
+  const pauseButton = document.getElementById("pause");
+  const stopButton = document.getElementById("stop");
+  const setPlaybackUi = (state) => {
+    if (state === "playing") {
+      playButton.disabled = true;
+      pauseButton.disabled = false;
+      stopButton.disabled = false;
+    } else if (state === "paused") {
+      playButton.disabled = false;
+      playButton.textContent = "Resume";
+      pauseButton.disabled = true;
+      stopButton.disabled = false;
+    } else {
+      playButton.disabled = false;
+      playButton.textContent = "Play execution";
+      pauseButton.disabled = true;
+      stopButton.disabled = true;
+    }
+  };
+  const playStep = () => {
+    if (playbackIndex >= executionOrder.length) {
       clearInterval(timer);
-      event.target.dataset.playing = "false";
-      event.target.textContent = "Resume";
+      playing = false;
+      setPlaybackUi("idle");
       return;
     }
+    document
+      .querySelectorAll(".node")
+      .forEach((n) => n.classList.remove("pulse"));
+    const current = executionOrder[playbackIndex];
+    document
+      .querySelector(`[data-id="${current.id}"]`)
+      ?.classList.add("pulse");
+    highlightClauseForNode(current.id);
+    showFlow(current);
+    playbackIndex += 1;
+  };
+  const startPlayback = () => {
     if (playbackIndex >= executionOrder.length) {
       playbackIndex = 0;
-      cardHeight = 100;
+      cardHeight = 118;
       applyLayout(layoutMode);
       render();
       fitToPanel();
     }
-    event.target.dataset.playing = "true";
-    event.target.textContent = "Pause";
-    const step = () => {
-      if (playbackIndex >= executionOrder.length) {
-        clearInterval(timer);
-        event.target.dataset.playing = "false";
-        event.target.textContent = "Replay execution";
-        return;
-      }
-      document
-        .querySelectorAll(".node")
-        .forEach((n) => n.classList.remove("pulse"));
-      const current = executionOrder[playbackIndex];
-      document
-        .querySelector(`[data-id="${current.id}"]`)
-        ?.classList.add("pulse");
-      showFlow(current);
-      playbackIndex += 1;
-    };
-    step();
-    timer = setInterval(step, 1200);
+    clearInterval(timer);
+    playing = true;
+    setPlaybackUi("playing");
+    playStep();
+    timer = setInterval(playStep, 1200);
+  };
+  playButton.addEventListener("click", startPlayback);
+  pauseButton.addEventListener("click", () => {
+    clearInterval(timer);
+    playing = false;
+    setPlaybackUi("paused");
+  });
+  stopButton.addEventListener("click", () => {
+    clearInterval(timer);
+    playing = false;
+    playbackIndex = 0;
+    cardHeight = 118;
+    setPlaybackUi("idle");
+    applyLayout(layoutMode);
+    render();
+    fitToPanel();
   });
 
   document.getElementById("reset").addEventListener("click", () => {
     clearInterval(timer);
-    const play = document.getElementById("play");
+    playing = false;
     playbackIndex = 0;
-    cardHeight = 100;
-    play.dataset.playing = "false";
-    play.textContent = "Play execution";
+    cardHeight = 118;
+    setPlaybackUi("idle");
     document
       .querySelectorAll(".node")
       .forEach((n) => n.classList.remove("pulse", "active"));
+    document
+      .querySelectorAll(".sql-clause")
+      .forEach((el) => el.classList.remove("active"));
     document
       .querySelectorAll(".flow-bar,.flow-bar-bg")
       .forEach((item) => item.remove());
@@ -823,11 +1509,14 @@
   });
 
   function fitToPanel() {
+    cancelAnimationFrame(scrollAnim);
+    zoomAnimation?.cancel();
     const panel = svg.parentElement;
+    const headerHeight = document.getElementById("query-panel")?.offsetHeight || 0;
     scale =
       layoutMode === "horizontal"
         ? Math.min(
-            panel.clientHeight / totalHeight,
+            (panel.clientHeight - headerHeight) / totalHeight,
             panel.clientWidth / totalWidth,
             1,
           )

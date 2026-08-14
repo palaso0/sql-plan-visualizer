@@ -1,0 +1,14 @@
+Sort  (cost=18420.50..18489.32 rows=12000 width=96) (actual time=204.812..220.341 rows=12000 loops=1)
+  Sort Key: o.created_at DESC
+  Sort Method: external merge  Disk: 812000kB
+  ->  Hash Join  (cost=420.00..16620.11 rows=67200 width=96) (actual time=11.540..119.271 rows=67200 loops=1)
+        Hash Cond: (o.customer_id = c.id)
+        ->  Seq Scan on orders o  (cost=0.00..12100.00 rows=850000 width=64) (actual time=0.021..68.091 rows=850000 loops=1)
+              Filter: (created_at >= CURRENT_DATE - '90 days'::interval)
+              Rows Removed by Filter: 420000
+        ->  Hash  (cost=310.00..310.00 rows=9000 width=32) (actual time=11.201..11.203 rows=9000 loops=1)
+              Buckets: 16384  Batches: 1  Memory Usage: 620kB
+              ->  Seq Scan on customers c  (cost=0.00..310.00 rows=9000 width=32) (actual time=0.010..5.814 rows=9000 loops=1)
+                    Filter: (account_state = 'active'::text)
+Planning Time: 1.842 ms
+Execution Time: 221.104 ms

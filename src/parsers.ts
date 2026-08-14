@@ -17,13 +17,26 @@ export class MySQLParser implements PlanParser {
       const inputRows = number(String(table.rows_examined_per_scan ?? '0'));
       const filtered = number(String(table.filtered ?? '100')) / 100;
       const estimatedRows = inputRows ? Math.round(inputRows * filtered) : number(String(table.rows_produced_per_join ?? '0'));
+      const details: string[] = [];
+      if (tableCost) {
+        if (tableCost.read_cost !== undefined) { details.push(`Read cost: ${number(String(tableCost.read_cost))}`); }
+        if (tableCost.eval_cost !== undefined) { details.push(`Eval cost: ${number(String(tableCost.eval_cost))}`); }
+        if (tableCost.prefix_cost !== undefined) { details.push(`Prefix cost: ${number(String(tableCost.prefix_cost))}`); }
+      }
+      if (Array.isArray(table.used_key_parts) && table.used_key_parts.length) { details.push(`Index key parts: ${table.used_key_parts.map(String).join(', ')}`); }
       return node(id, /ALL/i.test(label) ? NodeOperation.Scan : NodeOperation.IndexScan, label, {
         table: table.table_name as string | undefined,
         index: table.key as string | undefined,
+        possibleKeys: Array.isArray(table.possible_keys) ? table.possible_keys.map(String) : table.possible_keys ? [String(table.possible_keys)] : undefined,
+        keyLength: table.key_length as string | undefined,
+        ref: Array.isArray(table.ref) ? table.ref.map(String).join(', ') : table.ref as string | undefined,
+        filtered: Number(table.filtered) || undefined,
+        usedKeyParts: Array.isArray(table.used_key_parts) ? table.used_key_parts.map(String) : undefined,
         estimatedRows,
         inputRows,
         estimatedCost: number(String(tableCost?.prefix_cost ?? tableCost?.read_cost ?? '0')),
         filters: table.attached_condition ? [String(table.attached_condition)] : [],
+        details,
         children: []
       });
     }
@@ -44,6 +57,7 @@ export class MySQLParser implements PlanParser {
     const current = node(id, operation(label), label, {
       estimatedRows: number(String(value.rows_produced_per_join ?? '0')),
       estimatedCost: number(String(costInfo?.query_cost ?? costInfo?.prefix_cost ?? '0')),
+      extra: value.using_filesort ? 'using filesort' : undefined,
       children
     });
     if (!current.estimatedRows && children.length) {current.estimatedRows = Math.max(...children.map(child => child.estimatedRows));}
@@ -55,7 +69,22 @@ const keyLabel = (value: Record<string, unknown>): string => String(value.node_t
 
 export class PostgreSQLParser implements PlanParser {
   parse(input: string): PlanNode { if (/^[{[]/.test(input.trim())) { const value = JSON.parse(input) as Array<Record<string, unknown>>; const root = Array.isArray(value) ? value[0]?.Plan ?? value[0] : value; return this.jsonNode(root as Record<string, unknown>, 'root'); } return this.text(input); }
-  private jsonNode(value: Record<string, unknown>, id: string): PlanNode { const label = String(value['Node Type'] ?? 'Query'); const children = Array.isArray(value.Plans) ? value.Plans.map((child, i) => this.jsonNode(child as Record<string, unknown>, `${id}-${i}`)) : []; return node(id, operation(label), label, { table: value['Relation Name'] as string | undefined, index: value['Index Name'] as string | undefined, estimatedRows: number(String(value['Plan Rows'] ?? '0')), estimatedCost: number(String(value['Total Cost'] ?? '0')), actualRows: number(String(value['Actual Rows'] ?? '0')) || undefined, actualTime: number(String(value['Actual Total Time'] ?? '0')) || undefined, filters: [value.Filter, value['Join Filter']].filter(Boolean).map(String), children }); }
+  private jsonNode(value: Record<string, unknown>, id: string): PlanNode {
+    const label = String(value['Node Type'] ?? 'Query');
+    const children = Array.isArray(value.Plans) ? value.Plans.map((child, i) => this.jsonNode(child as Record<string, unknown>, `${id}-${i}`)) : [];
+    const joined = (key: string): string | undefined => { const v = value[key]; if (v === undefined) { return undefined; } return (Array.isArray(v) ? v : [v]).map(String).join(', '); };
+    const sortKey = joined('Sort Key');
+    const groupKey = joined('Group Key');
+    const condition = sortKey ? `sort key: ${sortKey}` : groupKey ? `group key: ${groupKey}` : value['Index Cond'] ? `condition: ${String(value['Index Cond'])}` : value['Hash Cond'] ? `join condition: ${String(value['Hash Cond'])}` : value['Merge Cond'] ? `merge condition: ${String(value['Merge Cond'])}` : undefined;
+    const details: string[] = [];
+    if (value['Join Type'] !== undefined) { details.push(`Join type: ${String(value['Join Type'])}`); }
+    if (value.Alias !== undefined) { details.push(`Alias: ${String(value.Alias)}`); }
+    if (value['Startup Cost'] !== undefined) { details.push(`Startup cost: ${number(String(value['Startup Cost']))}`); }
+    if (value['Plan Width'] !== undefined) { details.push(`Row width: ${String(value['Plan Width'])} bytes`); }
+    if (value['Actual Startup Time'] !== undefined) { details.push(`Actual startup: ${number(String(value['Actual Startup Time']))} ms`); }
+    if (value['Actual Loops'] !== undefined) { details.push(`Actual loops: ${number(String(value['Actual Loops']))}`); }
+    return node(id, operation(label), label, { table: value['Relation Name'] as string | undefined, index: value['Index Name'] as string | undefined, estimatedRows: number(String(value['Plan Rows'] ?? '0')), estimatedCost: number(String(value['Total Cost'] ?? '0')), actualRows: number(String(value['Actual Rows'] ?? '0')) || undefined, actualTime: number(String(value['Actual Total Time'] ?? '0')) || undefined, filters: [value.Filter, value['Join Filter']].filter(Boolean).map(String), condition, details, children });
+  }
   private text(input: string): PlanNode { const lines = input.split(/\r?\n/).filter(line => /(?:->\s*)?(Seq Scan|Index Scan|Bitmap|Nested Loop|Hash Join|Merge Join|Sort|Aggregate|Limit|Gather|Append|Result)/i.test(line)); const children = lines.map((line, index) => { const label = line.replace(/^\s*->\s*/, '').split(/\s{2,}/)[0]; const rows = line.match(/rows=(\d+)/i)?.[1]; const cost = line.match(/cost=[\d.]+\.\.(\d+(?:\.\d+)?)/i)?.[1]; return node(`node-${index}`, operation(label), label, { table: tableFrom(line), estimatedRows: number(rows), estimatedCost: number(cost), filters: line.match(/Filter:\s*(.*)/i)?.[1] ? [line.match(/Filter:\s*(.*)/i)![1]] : [] }); }); return node('root', NodeOperation.Other, 'PostgreSQL query', { children: children.length ? children : [node('empty', NodeOperation.Other, 'No plan nodes')] }); }
 }
 
