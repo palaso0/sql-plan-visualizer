@@ -17,7 +17,7 @@ export class PlanAnalyzer {
       current.children.forEach(visit);
     };
     visit(root);
-    return { root, issues, engine, totals: { estimatedCost, estimatedRows, nodeCount } };
+    return { root, issues, engine, totals: { estimatedCost, estimatedRows, nodeCount }, planningTime: root.planningTime, executionTime: root.executionTime };
   }
   private add(issues: PlanIssue[], node: PlanNode, code: string, severity: Severity, message: string, hint: string): void { if (!issues.some(issue => issue.nodeId === node.id && issue.code === code)) {issues.push({ nodeId: node.id, code, severity, message, hint });} }
 }

@@ -1,6 +1,10 @@
 (() => {
   const vscode = acquireVsCodeApi();
   const plan = window.__PLAN__;
+  const fontProbe = document.createElement("span");
+  fontProbe.style.fontFamily = "var(--vscode-editor-font-family, Arial, sans-serif)";
+  document.body.appendChild(fontProbe);
+  let fontFamily = getComputedStyle(fontProbe).fontFamily || "Arial, sans-serif";
   const svg = document.getElementById("diagram");
   const tooltip = (() => {
     const element = document.createElement("div");
@@ -9,6 +13,20 @@
     document.body.appendChild(element);
     return element;
   })();
+  const positionTooltip = (event) => {
+    const rect = tooltip.getBoundingClientRect();
+    const gap = 14;
+    let left = event.clientX + gap;
+    let top = event.clientY + gap;
+    if (left + rect.width > window.innerWidth) {
+      left = Math.max(8, event.clientX - rect.width - gap);
+    }
+    if (top + rect.height > window.innerHeight) {
+      top = Math.max(8, event.clientY - rect.height - gap);
+    }
+    tooltip.style.left = `${left}px`;
+    tooltip.style.top = `${top}px`;
+  };
   const ns = "http://www.w3.org/2000/svg";
   const nodes = plan.nodes;
   const issues = new Map();
@@ -194,6 +212,12 @@
     if (v >= 1000) return `${(v / 1000).toFixed(2)}K`;
     return v % 1 === 0 ? String(v) : v.toFixed(2);
   };
+  const fmtMs = (v) => {
+    if (!v) return "0 ms";
+    if (v < 1) return `${v.toFixed(3)} ms`;
+    if (v < 100) return `${v.toFixed(2)} ms`;
+    return `${v.toFixed(1)} ms`;
+  };
   const measure = document.createElement("canvas").getContext("2d");
   const fitTextTo = (text, font, maxWidth) => {
     if (!text) return "";
@@ -320,6 +344,8 @@
     if (node.inputRows) add("Rows examined", node.inputRows.toLocaleString());
     if (node.actualRows) add("Actual rows", node.actualRows.toLocaleString());
     if (node.actualTime) add("Actual time", `${node.actualTime} ms`);
+    if (node.planningTime != null) add("Planning time", `${node.planningTime} ms`);
+    if (node.executionTime != null) add("Execution time", `${node.executionTime} ms`);
     if (node.filters?.length) add("Filters", node.filters.join(" | "));
     if (node.extra) add("Extra", node.extra);
     if (node.details?.length) {
@@ -362,12 +388,20 @@
     "Bitmap Index Scan": { label: "Bitmap Index Scan", desc: "Builds a bitmap of row locations from an index" },
     "Nested Loop": { label: "Nested Loop", desc: "For each outer row, searches the inner input" },
     "Hash Join": { label: "Hash Join", desc: "Hashes one input and probes it with the other" },
+    "Hash Left Join": { label: "Hash Left Join", desc: "Hashes one input and probes it with the other, keeping all left rows" },
+    "Hash Right Join": { label: "Hash Right Join", desc: "Hashes one input and probes it with the other, keeping all right rows" },
+    "Hash Full Join": { label: "Hash Full Join", desc: "Hashes one input and emits all matching and unmatched rows" },
     "Merge Join": { label: "Merge Join", desc: "Sorts both inputs, then merges matching rows" },
+    "Merge Left Join": { label: "Merge Left Join", desc: "Merges sorted inputs, keeping all left rows" },
+    "Merge Right Join": { label: "Merge Right Join", desc: "Merges sorted inputs, keeping all right rows" },
+    "Merge Full Join": { label: "Merge Full Join", desc: "Merges sorted inputs and emits all matching and unmatched rows" },
     "Hash": { label: "Hash", desc: "Builds an in-memory hash table for a join" },
     "Sort": { label: "Sort", desc: "Orders rows; may spill to disk" },
     "WindowAgg": { label: "Window Aggregate", desc: "Computes window functions (ROW_NUMBER, RANK, COUNT/SUM per row group)" },
     "GroupAggregate": { label: "Group Aggregate", desc: "Groups and aggregates rows after sorting" },
     "HashAggregate": { label: "Hash Aggregate", desc: "Groups and aggregates rows with a hash table" },
+    "Partial HashAggregate": { label: "Partial Hash Aggregate", desc: "Aggregates rows in a parallel worker" },
+    "Finalize GroupAggregate": { label: "Finalize Group Aggregate", desc: "Combines parallel partial aggregates" },
     "Aggregate": { label: "Aggregate", desc: "Groups or summarizes rows" },
     "Limit": { label: "Limit", desc: "Stops after N rows" },
     "Gather": { label: "Gather", desc: "Collects rows from parallel workers" },
@@ -558,7 +592,7 @@
       appendIcon(g, node.operation, isRoot && node.operation === "other");
 
       const opLabel = make("text", { x: "38", y: "27", class: "operation" });
-      opLabel.textContent = fitTextTo(info.label, "600 12px Arial, sans-serif", 190);
+      opLabel.textContent = fitTextTo(info.label, `600 12px ${fontFamily}`, 190);
       g.appendChild(opLabel);
 
       if (node.table) {
@@ -566,13 +600,13 @@
         const prefix = make("tspan", { class: "node-label" });
         prefix.textContent = "table: ";
         const name = make("tspan", { class: "node-table" });
-        name.textContent = fitTextTo(node.table, "600 13px Arial, sans-serif", 196);
+        name.textContent = fitTextTo(node.table, `600 13px ${fontFamily}`, 196);
         table.appendChild(prefix);
         table.appendChild(name);
         g.appendChild(table);
       } else {
         const desc = make("text", { x: "14", y: "47", class: "node-desc" });
-        desc.textContent = fitTextTo(node.condition || info.desc, "10px Arial, sans-serif", 218);
+        desc.textContent = fitTextTo(node.condition || info.desc, `10px ${fontFamily}`, 218);
         g.appendChild(desc);
       }
 
@@ -582,12 +616,12 @@
       if (node.ref) detailParts.push(`ref ${node.ref}`);
       else if (node.possibleKeys?.length)
         detailParts.push(`possible keys: ${node.possibleKeys.join(", ")}`);
-      detail.textContent = fitTextTo(detailParts.join("  "), "10px Arial, sans-serif", 218);
+      detail.textContent = fitTextTo(detailParts.join("  "), `10px ${fontFamily}`, 218);
       if (detail.textContent) g.appendChild(detail);
 
       if (node.condition && node.table) {
         const cond = make("text", { x: "14", y: "79", class: "node-detail" });
-        cond.textContent = fitTextTo(node.condition, "10px Arial, sans-serif", 218);
+        cond.textContent = fitTextTo(node.condition, `10px ${fontFamily}`, 218);
         g.appendChild(cond);
       } else if (node.filtered !== undefined && node.filtered < 100) {
         const filt = make("text", { x: "14", y: "79", class: "node-detail" });
@@ -598,17 +632,32 @@
       const metric = make("text", { x: "14", y: "95", class: "metric" });
       metric.textContent = fitTextTo(
         `${fmt(node.estimatedRows)} rows   ${fmtCost(node.estimatedCost)} cost`,
-        "10px Arial, sans-serif",
+        `10px ${fontFamily}`,
         218,
       );
       g.appendChild(metric);
       if (node.actualTime || node.actualRows) {
         const actual = make("text", { x: "14", y: "108", class: "metric" });
         const actualParts = [];
-        if (node.actualTime) actualParts.push(`${node.actualTime.toFixed(1)} ms`);
+        if (node.actualTime) actualParts.push(fmtMs(node.actualTime));
         if (node.actualRows) actualParts.push(`${fmt(node.actualRows)} actual`);
         actual.textContent = actualParts.join("   ");
         g.appendChild(actual);
+      }
+      if (isRoot && (plan.planningTime != null || plan.executionTime != null)) {
+        const condRowTaken = Boolean(node.table && node.condition);
+        let timingY = 63;
+        if (plan.planningTime != null) {
+          const planning = make("text", { x: "14", y: String(timingY), class: "node-detail" });
+          planning.textContent = `planning ${fmtMs(plan.planningTime)}`;
+          g.appendChild(planning);
+          timingY += 16;
+        }
+        if (plan.executionTime != null && !condRowTaken) {
+          const execution = make("text", { x: "14", y: String(timingY), class: "node-detail" });
+          execution.textContent = `execution ${fmtMs(plan.executionTime)}`;
+          g.appendChild(execution);
+        }
       }
 
       if (issues.has(node.id)) {
@@ -633,13 +682,9 @@
       g.addEventListener("mouseenter", (event) => {
         tooltip.innerHTML = tooltipHtml(node, info);
         tooltip.classList.add("visible");
-        tooltip.style.left = `${event.clientX + 14}px`;
-        tooltip.style.top = `${event.clientY + 14}px`;
+        positionTooltip(event);
       });
-      g.addEventListener("mousemove", (event) => {
-        tooltip.style.left = `${event.clientX + 14}px`;
-        tooltip.style.top = `${event.clientY + 14}px`;
-      });
+      g.addEventListener("mousemove", positionTooltip);
       g.addEventListener("mouseleave", () =>
         tooltip.classList.remove("visible"),
       );
@@ -656,7 +701,6 @@
       let drag;
       g.addEventListener("pointerdown", (event) => {
         event.stopPropagation();
-        if (panMode) return;
         g.setPointerCapture(event.pointerId);
         drag = {
           x: event.clientX,
@@ -756,36 +800,6 @@
   });
   document.getElementById("zoom-fit")?.addEventListener("click", fitToPanel);
   const panel = svg.parentElement;
-  let panMode = false;
-  let panStart;
-  const panButton = document.getElementById("pan-toggle");
-  panButton?.addEventListener("pointerdown", (event) =>
-    event.stopPropagation(),
-  );
-  panButton?.addEventListener("click", () => {
-    panMode = !panMode;
-    panButton.classList.toggle("active", panMode);
-    panButton.setAttribute("aria-pressed", String(panMode));
-    panel.classList.toggle("pan-mode", panMode);
-  });
-  panel.addEventListener("pointerdown", (event) => {
-    if (!panMode) return;
-    panStart = {
-      x: event.clientX,
-      y: event.clientY,
-      left: panel.scrollLeft,
-      top: panel.scrollTop,
-    };
-    panel.setPointerCapture(event.pointerId);
-  });
-  panel.addEventListener("pointermove", (event) => {
-    if (!panStart) return;
-    panel.scrollLeft = panStart.left - (event.clientX - panStart.x);
-    panel.scrollTop = panStart.top - (event.clientY - panStart.y);
-  });
-  panel.addEventListener("pointerup", () => {
-    panStart = undefined;
-  });
   document.getElementById("layout")?.addEventListener("change", (event) => {
     applyLayout(event.target.value);
     render();
@@ -798,7 +812,7 @@
   document.getElementById("export")?.addEventListener("click", () => {
     const clone = svg.cloneNode(true);
     const style = document.createElementNS(ns, "style");
-    style.textContent = `.node text{font-family:Arial,sans-serif;fill:#cccccc}.node>rect{fill:#252526;stroke:#454545;stroke-width:1}.node.root>rect{fill:#2d2d30;stroke:#89d185;stroke-width:2}.node.warning>rect{stroke:#e2c08d;stroke-width:2}.node.critical>rect{stroke:#f14c4c;stroke-width:2}.node .node-icon path{fill:none;stroke:#75beff;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}.node .node-icon path.node-icon-filled{fill:#75beff;stroke:none}.node text.operation{font-size:12px;font-weight:600}.node text.node-desc{font-size:10px;fill:#9d9d9d}.node .node-table{font-size:13px;font-weight:600;fill:#75beff}.node .node-label{font-size:10px;fill:#9d9d9d}.node text.node-detail{font-size:10px;fill:#9d9d9d}.node text.metric{font-size:10px;fill:#9d9d9d}.node text.flag{font-size:11px;fill:#e2c08d;font-weight:700}.node.critical text.flag{fill:#f14c4c}.node text.flow-label{font-size:8px;fill:#9d9d9d;font-weight:700}.node text.flow-value{font-size:8px;fill:#cccccc}.node .flow-bar-bg{fill:#454545;stroke:none}.node .flow-bar{fill:#75beff;stroke:none}.node .flow-input{fill:#e2c08d}.node .flow-output{fill:#89d185}.edge{fill:none;stroke:#75beff}.flow-particle{fill:#75beff}.flow-label{font-family:Arial,sans-serif;font-size:11px;font-weight:700}.flow-label.entry{fill:#75beff}.flow-label.exit{fill:#89d185}`;
+    style.textContent = `.node text{font-family:${fontFamily};fill:#cccccc}.node>rect{fill:#252526;stroke:#454545;stroke-width:1}.node.root>rect{fill:#2d2d30;stroke:#89d185;stroke-width:2}.node.warning>rect{stroke:#e2c08d;stroke-width:2}.node.critical>rect{stroke:#f14c4c;stroke-width:2}.node .node-icon path{fill:none;stroke:#75beff;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}.node .node-icon path.node-icon-filled{fill:#75beff;stroke:none}.node text.operation{font-size:12px;font-weight:600}.node text.node-desc{font-size:10px;fill:#9d9d9d}.node .node-table{font-size:13px;font-weight:600;fill:#75beff}.node .node-label{font-size:10px;fill:#9d9d9d}.node text.node-detail{font-size:10px;fill:#9d9d9d}.node text.metric{font-size:10px;fill:#9d9d9d}.node text.flag{font-size:11px;fill:#e2c08d;font-weight:700}.node.critical text.flag{fill:#f14c4c}.node text.flow-label{font-size:8px;fill:#9d9d9d;font-weight:700}.node text.flow-value{font-size:8px;fill:#cccccc}.node .flow-bar-bg{fill:#454545;stroke:none}.node .flow-bar{fill:#75beff;stroke:none}.node .flow-input{fill:#e2c08d}.node .flow-output{fill:#89d185}.edge{fill:none;stroke:#75beff}.flow-particle{fill:#75beff}.flow-label{font-family:${fontFamily};font-size:11px;font-weight:700}.flow-label.entry{fill:#75beff}.flow-label.exit{fill:#89d185}`;
     clone.insertBefore(style, clone.firstChild);
     clone.removeAttribute("style");
     const bounds = svg.getBBox();
@@ -842,12 +856,21 @@
     image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(source)}`;
   });
 
+  const engineNames = {
+    mysql: "MySQL",
+    postgresql: "PostgreSQL",
+    sqlite: "SQLite",
+    oracle: "Oracle",
+    sqlserver: "SQL Server",
+  };
   document.getElementById("summary").textContent =
-    `${plan.engine.engine}${plan.engine.version ? ` ${plan.engine.version}` : ""} \u00B7 ${plan.totals.nodeCount} operations`;
+    `${engineNames[plan.engine.engine] || plan.engine.engine}${plan.engine.version ? ` ${plan.engine.version}` : ""}`;
 
-  document.getElementById("metrics").innerHTML =
+  document.getElementById("stats-bar").innerHTML =
     `<div class="stat"><strong>${fmtCost(plan.totals.estimatedCost)}</strong><span>total cost</span></div>` +
     `<div class="stat"><strong>${fmt(plan.totals.estimatedRows)}</strong><span>peak rows</span></div>` +
+    (plan.planningTime != null ? `<div class="stat"><strong>${fmtMs(plan.planningTime)}</strong><span>planning</span></div>` : "") +
+    (plan.executionTime != null ? `<div class="stat"><strong>${fmtMs(plan.executionTime)}</strong><span>execution</span></div>` : "") +
     `<div class="stat"><strong>${plan.issues.length}</strong><span>warnings</span></div>` +
     `<div class="stat"><strong>${plan.totals.nodeCount}</strong><span>operations</span></div>`;
 
@@ -1498,10 +1521,6 @@
       totalWidth = defaultDimensions.width;
       totalHeight = defaultDimensions.height;
     }
-    panMode = false;
-    panButton?.classList.remove("active");
-    panButton?.setAttribute("aria-pressed", "false");
-    panel.classList.remove("pan-mode");
     panel.scrollLeft = 0;
     panel.scrollTop = 0;
     render();
@@ -1530,4 +1549,18 @@
   render();
   fitToPanel();
   window.addEventListener("resize", fitToPanel);
+  new MutationObserver(() => {
+    const current = getComputedStyle(fontProbe).fontFamily;
+    if (current && current !== fontFamily) {
+      fontFamily = current;
+      render();
+      applyScale();
+    }
+  }).observe(document.documentElement, {
+    subtree: true,
+    childList: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: ["style"],
+  });
 })();

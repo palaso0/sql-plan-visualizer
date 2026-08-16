@@ -3,7 +3,7 @@ import { DetectionResult, Engine, NodeOperation, PlanNode } from './constants';
 export interface PlanParser { parse(input: string, detection: DetectionResult): PlanNode; }
 const number = (value: string | undefined): number => Number((value ?? '0').replace(/,/g, '')) || 0;
 const node = (id: string, operation: NodeOperation, label: string, values: Partial<PlanNode> = {}): PlanNode => ({ id, operation, label, estimatedRows: 0, estimatedCost: 0, filters: [], children: [], ...values });
-const operation = (label: string): NodeOperation => { const value = label.toLowerCase(); if (/join|loop/.test(value)) {return NodeOperation.Join;} if (/sort|filesort|temp b-tree/.test(value)) {return NodeOperation.Sort;} if (/aggregate|group|hash/.test(value)) {return NodeOperation.Aggregate;} if (/filter|where/.test(value)) {return NodeOperation.Filter;} if (/limit/.test(value)) {return NodeOperation.Limit;} if (/index|search/.test(value)) {return NodeOperation.IndexScan;} if (/scan|access/.test(value)) {return NodeOperation.Scan;} return NodeOperation.Other; };
+const operation = (label: string): NodeOperation => { const value = label.toLowerCase(); if (/^(hash|hash join)$/.test(value)) {return NodeOperation.Join;} if (/join|loop/.test(value)) {return NodeOperation.Join;} if (/sort|filesort|temp b-tree/.test(value)) {return NodeOperation.Sort;} if (/aggregate|group/.test(value)) {return NodeOperation.Aggregate;} if (/filter|where/.test(value)) {return NodeOperation.Filter;} if (/limit/.test(value)) {return NodeOperation.Limit;} if (/index|search/.test(value)) {return NodeOperation.IndexScan;} if (/scan|access/.test(value)) {return NodeOperation.Scan;} return NodeOperation.Other; };
 const tableFrom = (label: string): string | undefined => label.match(/(?:on|from|table)\s+([\w.]+)/i)?.[1];
 
 export class MySQLParser implements PlanParser {
@@ -68,7 +68,18 @@ export class MySQLParser implements PlanParser {
 const keyLabel = (value: Record<string, unknown>): string => String(value.node_type ?? value.operation ?? (value.table as Record<string, unknown> | undefined)?.access_type ?? 'Operation');
 
 export class PostgreSQLParser implements PlanParser {
-  parse(input: string): PlanNode { if (/^[{[]/.test(input.trim())) { const value = JSON.parse(input) as Array<Record<string, unknown>>; const root = Array.isArray(value) ? value[0]?.Plan ?? value[0] : value; return this.jsonNode(root as Record<string, unknown>, 'root'); } return this.text(input); }
+  parse(input: string): PlanNode {
+    if (/^[{[]/.test(input.trim())) {
+      const value = JSON.parse(input) as Array<Record<string, unknown>>;
+      const top = (Array.isArray(value) ? value[0] : value) as Record<string, unknown> | undefined;
+      const root = (top?.Plan as Record<string, unknown> | undefined) ?? top ?? {};
+      const parsed = this.jsonNode(root, 'root');
+      if (typeof top?.['Planning Time'] === 'number') { parsed.planningTime = top['Planning Time']; }
+      if (typeof top?.['Execution Time'] === 'number') { parsed.executionTime = top['Execution Time']; }
+      return parsed;
+    }
+    return this.text(input);
+  }
   private jsonNode(value: Record<string, unknown>, id: string): PlanNode {
     const label = String(value['Node Type'] ?? 'Query');
     const children = Array.isArray(value.Plans) ? value.Plans.map((child, i) => this.jsonNode(child as Record<string, unknown>, `${id}-${i}`)) : [];
@@ -83,9 +94,66 @@ export class PostgreSQLParser implements PlanParser {
     if (value['Plan Width'] !== undefined) { details.push(`Row width: ${String(value['Plan Width'])} bytes`); }
     if (value['Actual Startup Time'] !== undefined) { details.push(`Actual startup: ${number(String(value['Actual Startup Time']))} ms`); }
     if (value['Actual Loops'] !== undefined) { details.push(`Actual loops: ${number(String(value['Actual Loops']))}`); }
+    if (value['Inner Unique'] !== undefined) { details.push(`Inner unique: ${String(value['Inner Unique'])}`); }
+    if (value['Parent Relationship'] !== undefined) { details.push(`Parent relationship: ${String(value['Parent Relationship'])}`); }
+    if (value['Hash Buckets'] !== undefined) { details.push(`Hash buckets: ${number(String(value['Hash Buckets'])).toLocaleString()}`); }
+    if (value['Hash Batches'] !== undefined) { details.push(`Hash batches: ${number(String(value['Hash Batches']))}`); }
+    if (value['Peak Memory Usage'] !== undefined) { details.push(`Peak memory usage: ${number(String(value['Peak Memory Usage']))}kB`); }
     return node(id, operation(label), label, { table: value['Relation Name'] as string | undefined, index: value['Index Name'] as string | undefined, estimatedRows: number(String(value['Plan Rows'] ?? '0')), estimatedCost: number(String(value['Total Cost'] ?? '0')), actualRows: number(String(value['Actual Rows'] ?? '0')) || undefined, actualTime: number(String(value['Actual Total Time'] ?? '0')) || undefined, filters: [value.Filter, value['Join Filter']].filter(Boolean).map(String), condition, details, children });
   }
-  private text(input: string): PlanNode { const lines = input.split(/\r?\n/).filter(line => /(?:->\s*)?(Seq Scan|Index Scan|Bitmap|Nested Loop|Hash Join|Merge Join|Sort|Aggregate|Limit|Gather|Append|Result)/i.test(line)); const children = lines.map((line, index) => { const label = line.replace(/^\s*->\s*/, '').split(/\s{2,}/)[0]; const rows = line.match(/rows=(\d+)/i)?.[1]; const cost = line.match(/cost=[\d.]+\.\.(\d+(?:\.\d+)?)/i)?.[1]; return node(`node-${index}`, operation(label), label, { table: tableFrom(line), estimatedRows: number(rows), estimatedCost: number(cost), filters: line.match(/Filter:\s*(.*)/i)?.[1] ? [line.match(/Filter:\s*(.*)/i)![1]] : [] }); }); return node('root', NodeOperation.Other, 'PostgreSQL query', { children: children.length ? children : [node('empty', NodeOperation.Other, 'No plan nodes')] }); }
+  private text(input: string): PlanNode {
+    const root = node('root', NodeOperation.Other, 'PostgreSQL query', { children: [] });
+    let current: PlanNode | undefined;
+    for (const raw of input.split(/\r?\n/)) {
+      const line = raw.trim();
+      if (!line) { continue; }
+      const planTime = line.match(/^Planning\s+Time:\s*([\d.]+)\s*ms$/i);
+      if (planTime) { root.planningTime = number(planTime[1]); continue; }
+      const execTime = line.match(/^Execution\s+Time:\s*([\d.]+)\s*ms$/i);
+      if (execTime) { root.executionTime = number(execTime[1]); continue; }
+      if (/^(?:->\s*)?\S.*\(cost\s*=/i.test(line)) {
+        const detail = line.replace(/^->\s*/, '').trim();
+        const label = detail.split(/\(cost\s*=/i)[0].trim();
+        const rows = detail.match(/rows=(\d+)/i)?.[1];
+        const cost = detail.match(/cost=[\d.]+\.\.(\d+(?:\.\d+)?)/i)?.[1];
+        const actual = detail.match(/actual time=([\d.]+)\.\.([\d.]+)\s+rows=(\d+)\s+loops=(\d+)/i);
+        const width = detail.match(/width=(\d+)/i)?.[1];
+        const details: string[] = [];
+        if (width) { details.push(`Width: ${width} bytes`); }
+        if (actual) { details.push(`Loops: ${actual[4]}`); }
+        const child = node(`node-${root.children.length}`, operation(label), label, {
+          table: tableFrom(detail),
+          estimatedRows: number(rows),
+          estimatedCost: number(cost),
+          actualRows: actual ? number(actual[3]) : undefined,
+          actualTime: actual ? number(actual[2]) : undefined,
+          filters: [],
+          details
+        });
+        root.children.push(child);
+        current = child;
+        continue;
+      }
+      if (!current) { continue; }
+      const hashCond = line.match(/^Hash\s+Cond:\s*(.*)$/i);
+      const mergeCond = line.match(/^Merge\s+Cond:\s*(.*)$/i);
+      const indexCond = line.match(/^Index\s+Cond:\s*(.*)$/i);
+      const sortKey = line.match(/^Sort\s+Key:\s*(.*)$/i);
+      const groupKey = line.match(/^Group\s+Key:\s*(.*)$/i);
+      const filter = line.match(/^Filter:\s*(.*)$/i);
+      const joinFilter = line.match(/^Join\s+Filter:\s*(.*)$/i);
+      if (hashCond) { current.condition = `join condition: ${hashCond[1]}`; }
+      else if (mergeCond) { current.condition = `merge condition: ${mergeCond[1]}`; }
+      else if (indexCond) { current.condition = `condition: ${indexCond[1]}`; }
+      else if (sortKey) { current.condition = `sort key: ${sortKey[1]}`; }
+      else if (groupKey) { current.condition = `group key: ${groupKey[1]}`; }
+      else if (filter) { current.filters.push(filter[1]); }
+      else if (joinFilter) { current.filters.push(joinFilter[1]); }
+      else { current.details!.push(line); }
+    }
+    if (!root.children.length) { root.children.push(node('empty', NodeOperation.Other, 'No plan nodes')); }
+    return root;
+  }
 }
 
 export class OracleParser implements PlanParser {

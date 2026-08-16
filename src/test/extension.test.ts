@@ -50,6 +50,35 @@ suite('SQL Plan Visualizer', () => {
     });
   });
 
+  test('PG text captures actuals, conditions, Hash nodes and plan timing', () => {
+    const plan = fs.readFileSync(path.join(exampleDir, '2-postgresql-text.txt'), 'utf8');
+    const detection = new EngineDetector().detect(plan);
+    assert.strictEqual(detection?.engine, Engine.PostgreSQL);
+    const root = new ParserFactory().create(Engine.PostgreSQL).parse(plan, detection!);
+    assert.strictEqual(root.planningTime, 1.842);
+    assert.strictEqual(root.executionTime, 221.104);
+    const join = root.children.find((c) => c.label === 'Hash Join');
+    assert.ok(join, 'Hash Join node should be captured');
+    assert.strictEqual(join!.condition, 'join condition: (o.customer_id = c.id)');
+    assert.strictEqual(join!.actualRows, 67200);
+    assert.strictEqual(join!.actualTime, 119.271);
+    const sort = root.children[0];
+    assert.strictEqual(sort.condition, 'sort key: o.created_at DESC');
+    assert.ok(sort.details?.some((line) => line.startsWith('Width: 96')), 'node width should be captured');
+    assert.ok(root.children.some((c) => c.label === 'Hash'), 'Hash node should be captured');
+    const scan = root.children.find((c) => c.label === 'Seq Scan on orders o');
+    assert.strictEqual(scan?.filters.length, 1);
+  });
+  test('PG JSON captures top-level planning and execution time', () => {
+    const plan = JSON.stringify([{ Plan: { 'Node Type': 'Hash Join', 'Hash Cond': '(o.product_id = p.id)', 'Plan Rows': 1570, 'Total Cost': 30.93, 'Actual Total Time': 0.082, 'Actual Rows': 5 }, 'Planning Time': 0.315, 'Execution Time': 0.131 }]);
+    const detection = new EngineDetector().detect(plan);
+    assert.strictEqual(detection?.engine, Engine.PostgreSQL);
+    const root = new ParserFactory().create(Engine.PostgreSQL).parse(plan, detection!);
+    assert.strictEqual(root.planningTime, 0.315);
+    assert.strictEqual(root.executionTime, 0.131);
+    assert.strictEqual(root.condition, 'join condition: (o.product_id = p.id)');
+    assert.strictEqual(root.actualTime, 0.082);
+  });
   test('dialect mismatch flags PostgreSQL interval in MySQL SQL', () => {
     assert.ok(sqlDialectMismatch("SELECT * FROM orders WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'", 'mysql'));
     assert.ok(sqlDialectMismatch('SELECT * FROM "orders" WHERE amount::numeric > 5', 'mysql'));
