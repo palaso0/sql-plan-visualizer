@@ -19,9 +19,7 @@ Understand SQL execution plans without deciphering intimidating text output. Pas
 
 JSON output is recommended because it preserves the complete hierarchy and metrics.
 
-## Requirements
-
-VS Code 1.125 or newer. The extension runs locally and does not send SQL or plans to an external service.
+The extension runs locally and does not send SQL or plans to an external service.
 
 ## Settings
 

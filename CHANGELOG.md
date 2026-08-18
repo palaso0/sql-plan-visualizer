@@ -4,6 +4,6 @@ All notable changes to the "sql-plan-visualizer" extension will be documented in
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [Unreleased]
+## [0.1.0]
 
-- Initial release
+Initial visual plan release with engine detection, parsing, analysis and animated SVG rendering.

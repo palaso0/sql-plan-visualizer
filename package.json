@@ -4,9 +4,14 @@
   "description": "Understand SQL execution plans through an animated visual diagram",
   "version": "0.1.0",
   "icon": "media/logo.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/palaso0/sql-plan-visualizer.git"
+  },
   "engines": {
     "vscode": "^1.79.0"
   },
+  
   "categories": [
     "Other"
   ],
