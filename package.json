@@ -1,7 +1,7 @@
 {
   "name": "sql-plan-visualizer",
   "displayName": "SQL Plan Visualizer",
-  "publisher": "palaso0",
+  "publisher": "palaso",
   "description": "Understand SQL execution plans through an animated visual diagram",
   "version": "0.1.0",
   "icon": "media/logo.png",
