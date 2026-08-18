@@ -3,8 +3,9 @@
   "displayName": "SQL Plan Visualizer",
   "description": "Understand SQL execution plans through an animated visual diagram",
   "version": "0.1.0",
+  "icon": "media/logo.png",
   "engines": {
-    "vscode": "^1.125.0"
+    "vscode": "^1.79.0"
   },
   "categories": [
     "Other"
@@ -46,7 +47,7 @@
         {
           "id": "sql-plan-visualizer",
           "title": "SQL Plan Visualizer",
-          "icon": "media/database.svg"
+          "icon": "media/icon.svg"
         }
       ]
     },
@@ -57,7 +58,7 @@
           "id": "sql-plan-visualizer.input",
           "name": "Visualize Plan",
           "when": "true",
-          "icon": "media/database.svg"
+          "icon": "media/icon.svg"
         }
       ]
     },
@@ -99,7 +100,7 @@
   "devDependencies": {
     "@types/mocha": "^10.0.10",
     "@types/node": "24.x",
-    "@types/vscode": "^1.125.0",
+    "@types/vscode": "^1.79.0",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.0.0",
     "eslint": "^10.5.0",
