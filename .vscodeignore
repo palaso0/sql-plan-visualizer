@@ -7,6 +7,17 @@ test/**
 examples/**
 media/engines/**
 node_modules/.cache/**
+node_modules/simple-icons/icons/**
+node_modules/simple-icons/data/**
+node_modules/simple-icons/index-icons.*
+node_modules/simple-icons/sdk.*
+node_modules/simple-icons/*.mjs
+node_modules/simple-icons/*.d.ts
+node_modules/simple-icons/jsconfig.json
+node_modules/simple-icons/README.md
+node_modules/simple-icons/LICENSE.md
+node_modules/simple-icons/DISCLAIMER.md
+node_modules/simple-icons/VERSIONING.md
 .gitignore
 .yarnrc
 AGENTS.md
